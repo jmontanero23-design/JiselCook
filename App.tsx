@@ -12,7 +12,7 @@ import { ShoppingList } from './components/ShoppingList';
 import { Cookbook } from './components/Cookbook';
 import { analyzeFridgeAndSuggestRecipes, generateRecipeImage, generateSurpriseRecipe } from './services/geminiService';
 import { Recipe, DietaryRestriction, UserProfile, Badge } from './types';
-import { Trash2, ShoppingCart, Plus } from 'lucide-react';
+import { Menu, ChefHat } from 'lucide-react';
 
 const STORAGE_KEYS = {
   PANTRY: 'culinarylens_pantry',
@@ -28,6 +28,9 @@ export default function App() {
   const [isCooking, setIsCooking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilters, setActiveFilters] = useState<DietaryRestriction[]>([]);
+  
+  // Mobile Sidebar State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Persisted State
   const [shoppingList, setShoppingList] = useState<string[]>(() => {
@@ -68,6 +71,7 @@ export default function App() {
       setSelectedRecipe(null);
     }
     setView(newView);
+    setIsSidebarOpen(false); // Close sidebar on navigation
   };
 
   const handleSurpriseMe = async () => {
@@ -215,81 +219,116 @@ export default function App() {
       }
   };
 
+  // Determine if mobile header should be shown
+  // Hide on full screen modes if necessary, or keep it. 
+  // RecipeDetail has its own header, so we can hide the mobile menu button there to avoid clutter
+  // OR we keep it so users can always access menu. Let's keep it for consistency unless cooking.
+  const showMobileHeader = !isCooking && !selectedRecipe;
+
   return (
     <div className="flex h-screen w-screen bg-slate-50 overflow-hidden">
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       <Sidebar 
         activeView={view} 
         onNavigate={handleNavigate}
         activeFilters={activeFilters}
         onToggleFilter={handleToggleFilter}
         shoppingListCount={shoppingList.length}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
       
-      <main className="flex-1 h-full relative overflow-hidden">
-        {view === 'home' && (
-          <CameraCapture onImageCaptured={handleImageCaptured} onSurpriseMe={handleSurpriseMe} isLoading={isLoading} />
-        )}
-
-        {view === 'kitchen-assistant' && (
-          <KitchenAssistant />
-        )}
-
-        {view === 'recipes' && !selectedRecipe && (
-          <RecipeList 
-            recipes={recipes} 
-            onSelectRecipe={(r) => setSelectedRecipe(r)} 
-          />
-        )}
-
-        {view === 'cookbook' && !selectedRecipe && (
-            <Cookbook 
-                savedRecipes={savedRecipes}
-                onSelectRecipe={setSelectedRecipe}
-                onRemoveRecipe={(id) => setSavedRecipes(prev => prev.filter(r => r.id !== id))}
-            />
-        )}
-
-        {(view === 'recipes' || view === 'cookbook') && selectedRecipe && (
-          <RecipeDetail 
-            recipe={selectedRecipe} 
-            onBack={() => setSelectedRecipe(null)}
-            onStartCooking={() => setIsCooking(true)}
-            onAddToShoppingList={handleAddToShoppingList}
-            shoppingList={shoppingList}
-            isSaved={savedRecipes.some(r => r.id === selectedRecipe.id)}
-            onToggleSave={handleToggleSaveRecipe}
-          />
-        )}
-
-        {view === 'pantry' && (
-          <Pantry 
-            pantryItems={pantry}
-            onAddPantryItem={handleAddPantryItem}
-            onRemovePantryItem={handleRemovePantryItem}
-          />
-        )}
-
-        {view === 'profile' && (
-          <Profile 
-            profile={userProfile}
-            onUpdateProfile={setUserProfile}
-          />
-        )}
-
-        {view === 'meal-planner' && (
-          <MealPlanner 
-            pantryItems={pantry}
-            userProfile={userProfile}
-          />
-        )}
+      <main className="flex-1 h-full relative overflow-hidden flex flex-col">
         
-        {view === 'shopping' && (
-          <ShoppingList 
-            items={shoppingList}
-            onAddItem={handleAddToShoppingList}
-            onRemoveItem={handleRemoveFromShoppingList}
-          />
+        {/* Mobile Header */}
+        {showMobileHeader && (
+            <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between flex-shrink-0 z-30">
+                <div className="flex items-center gap-2 text-emerald-700 font-bold">
+                    <ChefHat size={24} />
+                    <span>CulinaryLens</span>
+                </div>
+                <button 
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-full"
+                >
+                    <Menu size={24} />
+                </button>
+            </div>
         )}
+
+        <div className="flex-1 overflow-hidden relative flex flex-col">
+            {view === 'home' && (
+            <CameraCapture onImageCaptured={handleImageCaptured} onSurpriseMe={handleSurpriseMe} isLoading={isLoading} />
+            )}
+
+            {view === 'kitchen-assistant' && (
+            <KitchenAssistant />
+            )}
+
+            {view === 'recipes' && !selectedRecipe && (
+            <RecipeList 
+                recipes={recipes} 
+                onSelectRecipe={(r) => setSelectedRecipe(r)} 
+            />
+            )}
+
+            {view === 'cookbook' && !selectedRecipe && (
+                <Cookbook 
+                    savedRecipes={savedRecipes}
+                    onSelectRecipe={setSelectedRecipe}
+                    onRemoveRecipe={(id) => setSavedRecipes(prev => prev.filter(r => r.id !== id))}
+                />
+            )}
+
+            {(view === 'recipes' || view === 'cookbook') && selectedRecipe && (
+            <RecipeDetail 
+                recipe={selectedRecipe} 
+                onBack={() => setSelectedRecipe(null)}
+                onStartCooking={() => setIsCooking(true)}
+                onAddToShoppingList={handleAddToShoppingList}
+                shoppingList={shoppingList}
+                isSaved={savedRecipes.some(r => r.id === selectedRecipe.id)}
+                onToggleSave={handleToggleSaveRecipe}
+            />
+            )}
+
+            {view === 'pantry' && (
+            <Pantry 
+                pantryItems={pantry}
+                onAddPantryItem={handleAddPantryItem}
+                onRemovePantryItem={handleRemovePantryItem}
+            />
+            )}
+
+            {view === 'profile' && (
+            <Profile 
+                profile={userProfile}
+                onUpdateProfile={setUserProfile}
+            />
+            )}
+
+            {view === 'meal-planner' && (
+            <MealPlanner 
+                pantryItems={pantry}
+                userProfile={userProfile}
+            />
+            )}
+            
+            {view === 'shopping' && (
+            <ShoppingList 
+                items={shoppingList}
+                onAddItem={handleAddToShoppingList}
+                onRemoveItem={handleRemoveFromShoppingList}
+            />
+            )}
+        </div>
 
         {/* Full Screen Cooking Mode Overlay */}
         {isCooking && selectedRecipe && (
