@@ -204,6 +204,10 @@ export async function generateRecipeImage(recipeTitle: string, recipeDescription
             }
         });
         
+        if (!response.generatedImages?.[0]?.image?.imageBytes) {
+            return null;
+        }
+        
         const base64ImageBytes = response.generatedImages[0].image.imageBytes;
         return `data:image/jpeg;base64,${base64ImageBytes}`;
     } catch (error) {
