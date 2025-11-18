@@ -1,0 +1,8 @@
+{
+  "name": "CulinaryLens",
+  "description": "A smart culinary assistant that scans your fridge to suggest recipes, tracks missing ingredients, and guides you through cooking.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
