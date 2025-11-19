@@ -100,7 +100,7 @@ export const KitchenAssistant: React.FC = () => {
             const personaConfig = getPersonalityConfig(currentPersona);
 
             const sessionPromise = ai.live.connect({
-                model: 'gemini-2.0-flash-exp',
+                model: 'gemini-2.5-flash',
                 callbacks: {
                     onopen: () => {
                         setIsLiveConnected(true);

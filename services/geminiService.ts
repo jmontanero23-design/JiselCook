@@ -118,7 +118,7 @@ export async function analyzeFridgeAndSuggestRecipes(
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-2.5-pro',
             contents: {
                 parts: [
                     {
@@ -181,7 +181,7 @@ export async function generateSurpriseRecipe(userProfile: UserProfile, filters: 
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-2.5-pro',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -243,7 +243,7 @@ export async function remixRecipe(originalRecipe: Recipe, modification: string):
     `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-pro',
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -300,7 +300,7 @@ export async function generateMealPlan(ingredients: string[], userProfile: UserP
     };
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-pro',
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -314,7 +314,7 @@ export async function generateMealPlan(ingredients: string[], userProfile: UserP
 export async function findCookingResources(recipeTitle: string): Promise<SearchResult[]> {
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-2.5-flash",
             contents: `Find top-rated video tutorials, blog posts, or cooking guides for the recipe: "${recipeTitle}". Focus on reputable food sources.`,
             config: {
                 tools: [{ googleSearch: {} }],
@@ -361,7 +361,7 @@ export async function getNutritionalInsights(recipe: Recipe): Promise<string> {
     `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-pro',
         contents: prompt,
     });
 
@@ -389,7 +389,7 @@ export async function organizeShoppingList(items: string[]): Promise<ShoppingCat
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-2.5-pro',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -438,7 +438,7 @@ export async function processShoppingVoiceCommand(base64Audio: string, mimeType:
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-2.5-flash',
             contents: {
                 parts: [
                     {
@@ -473,7 +473,7 @@ export async function identifyIngredientsFromImage(base64Image: string): Promise
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.0-flash-exp',
+            model: 'gemini-2.5-flash',
             contents: {
                 parts: [
                     { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },

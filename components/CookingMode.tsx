@@ -138,7 +138,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
 
             // Connect to Gemini Live
             const sessionPromise = ai.live.connect({
-                model: 'gemini-2.0-flash-exp',
+                model: 'gemini-2.5-flash',
                 callbacks: {
                     onopen: () => {
                         console.log("Live Session Opened");
