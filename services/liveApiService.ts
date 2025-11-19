@@ -1,6 +1,6 @@
 // Gemini Live API Service - Proper SDK Implementation
 // Using @google/genai v1.30.0 with native Live API support
-// November 2025 - Using gemini-2.5-flash-native-audio-preview-09-2025 model
+// November 2025 - Using gemini-2.5-flash model for best audio quality and natural conversations
 
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 
@@ -35,18 +35,23 @@ export class GeminiLiveSession {
             await this.audioContext.resume();
 
             // Connect to Live API using SDK's built-in method
+            // Using the latest Gemini 2.5 Flash model for best audio quality
             this.session = await this.ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                model: 'gemini-2.5-flash',
                 callbacks: {
                     onopen: () => {
                         console.log('✅ Live API Session Opened');
                         this.config.onOpen?.();
                     },
                     onmessage: async (msg: LiveServerMessage) => {
+                        console.log('📨 Received message from Live API:', msg);
                         // Handle audio response
                         const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
                         if (audioData) {
+                            console.log('🔊 Playing audio response');
                             await this.playAudio(audioData);
+                        } else {
+                            console.log('⚠️ No audio data in response');
                         }
                         this.config.onMessage?.(msg);
                     },
@@ -111,6 +116,7 @@ export class GeminiLiveSession {
         }
 
         const base64Data = this.base64EncodeAudio(audioData);
+        console.log('📤 Sending audio chunk, size:', audioData.length);
 
         try {
             this.session.sendRealtimeInput({
@@ -120,7 +126,7 @@ export class GeminiLiveSession {
                 }
             });
         } catch (error) {
-            console.error('Error sending audio:', error);
+            console.error('❌ Error sending audio:', error);
         }
     }
 

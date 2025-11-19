@@ -1,53 +1,68 @@
-// Alternative image generation service using placeholder images
-// You can replace this with DALL-E, Stable Diffusion API, or other services
+// Image generation service with smart food image selection
+// Uses Unsplash for high-quality, relevant food photos
 
 export async function generateRecipeImage(recipeTitle: string, recipeDescription: string): Promise<string | null> {
     try {
-        // For now, using a high-quality food image placeholder service
-        // You can replace this with actual AI image generation when available
+        // Extract key food terms from the recipe title and description
+        const foodTerms = extractFoodTerms(recipeTitle, recipeDescription);
 
-        // Option 1: Use Unsplash for beautiful food photos (requires API key)
-        // const query = encodeURIComponent(recipeTitle.split(' ').slice(0, 2).join(' '));
-        // return `https://source.unsplash.com/800x600/?food,${query}`;
+        // Use Unsplash Source API for high-quality food images (no API key required)
+        // This provides much better results than generic placeholders
+        const query = encodeURIComponent(foodTerms.join(','));
 
-        // Option 2: Use a deterministic placeholder based on recipe name
-        const seed = recipeTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-        // Using a food-specific placeholder service
-        const foodCategories = [
-            'pasta', 'salad', 'soup', 'meat', 'fish', 'dessert',
-            'breakfast', 'sandwich', 'pizza', 'burger', 'sushi', 'curry'
-        ];
-
-        // Try to match a category from the title
-        let category = 'food';
-        for (const cat of foodCategories) {
-            if (recipeTitle.toLowerCase().includes(cat)) {
-                category = cat;
-                break;
-            }
-        }
-
-        // Using Lorem Picsum with a seed for consistent images
-        return `https://picsum.photos/seed/${seed}/800/600`;
-
-        // Alternative: Use a food-specific service
-        // return `https://foodish-api.com/images/${category}/${category}${Math.floor(Math.random() * 10) + 1}.jpg`;
+        // Returns a relevant, high-quality food image
+        // The 1.5 crop ratio works well for recipe cards
+        return `https://source.unsplash.com/800x600/?${query},food,dish,cuisine`;
 
     } catch (error) {
-        console.error("Error generating placeholder image:", error);
-        return null;
+        console.error("Error generating recipe image:", error);
+        // Fallback to a generic food image
+        return `https://source.unsplash.com/800x600/?food,meal,cooking`;
     }
 }
 
-// Future: Integrate with actual AI image generation
-export async function generateAIImage(prompt: string): Promise<string | null> {
-    // Placeholder for future integration with:
-    // - OpenAI DALL-E API
-    // - Stable Diffusion API
-    // - Google Imagen (when available in SDK)
-    // - Midjourney API
+// Helper function to extract relevant food terms for better image matching
+function extractFoodTerms(title: string, description: string): string[] {
+    const combinedText = `${title} ${description}`.toLowerCase();
 
-    console.log("AI image generation not yet implemented. Using placeholders.");
-    return null;
+    // Comprehensive food categories and ingredients for better matching
+    const foodKeywords = [
+        // Proteins
+        'chicken', 'beef', 'pork', 'fish', 'salmon', 'tuna', 'shrimp', 'tofu', 'egg', 'bacon',
+        // Carbs
+        'pasta', 'rice', 'noodles', 'bread', 'potato', 'quinoa', 'couscous',
+        // Dishes
+        'pizza', 'burger', 'sandwich', 'salad', 'soup', 'stew', 'curry', 'stir-fry', 'casserole',
+        // Cooking methods
+        'grilled', 'baked', 'roasted', 'fried', 'steamed', 'sauteed', 'braised',
+        // Desserts
+        'dessert', 'cake', 'cookies', 'chocolate', 'ice cream', 'pie', 'tart', 'pudding',
+        // Cuisines
+        'mexican', 'italian', 'asian', 'chinese', 'japanese', 'thai', 'indian', 'mediterranean',
+        // Meal types
+        'breakfast', 'lunch', 'dinner', 'brunch', 'appetizer', 'snack',
+        // Vegetables
+        'vegetable', 'salad', 'veggie', 'vegan', 'vegetarian'
+    ];
+
+    // Find matching keywords
+    const matches = foodKeywords.filter(keyword => combinedText.includes(keyword));
+
+    // If no specific matches, use words from the title
+    if (matches.length === 0) {
+        const titleWords = title.split(' ')
+            .filter(word => word.length > 3 && !['with', 'and', 'the', 'for'].includes(word.toLowerCase()))
+            .slice(0, 3);
+        return titleWords.length > 0 ? titleWords : ['gourmet', 'homemade', 'delicious'];
+    }
+
+    // Return top 3 most relevant terms for best image matching
+    return matches.slice(0, 3);
+}
+
+// Future: Integrate with actual AI image generation when available
+export async function generateAIImage(prompt: string): Promise<string | null> {
+    // For now, using the improved Unsplash approach
+    // When Google Imagen or other APIs become available, we can implement here
+    return generateRecipeImage(prompt, '');
 }
