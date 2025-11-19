@@ -10,6 +10,7 @@ import { MealPlanner } from './components/MealPlanner';
 import { KitchenAssistant } from './components/KitchenAssistant';
 import { ShoppingList } from './components/ShoppingList';
 import { Cookbook } from './components/Cookbook';
+import { LiveAPITest } from './components/LiveAPITest';
 import { analyzeFridgeAndSuggestRecipes, generateSurpriseRecipe } from './services/geminiService';
 import { generateRecipeImage } from './services/imageService';
 import { Recipe, DietaryRestriction, UserProfile, Badge } from './types';
@@ -32,6 +33,7 @@ export default function App() {
 
   // Mobile Sidebar State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showLiveAPITest, setShowLiveAPITest] = useState(false);
 
   // Persisted State
   const [shoppingList, setShoppingList] = useState<string[]>(() => {
@@ -242,6 +244,21 @@ export default function App() {
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
+
+      {/* Live API Test Component */}
+      {showLiveAPITest && (
+        <div id="live-api-test">
+          <LiveAPITest />
+        </div>
+      )}
+
+      {/* Test Button - Temporary for debugging */}
+      <button
+        onClick={() => setShowLiveAPITest(true)}
+        className="fixed bottom-4 right-4 z-50 px-4 py-2 bg-red-600 text-white rounded-lg shadow-lg hover:bg-red-700"
+      >
+        Test Live API
+      </button>
 
       <Sidebar
         activeView={view}
