@@ -17,10 +17,10 @@ export const KitchenAssistant: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sessionRef = useRef<GeminiLiveSession | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
-    const audioStreamRef = useRef<MediaStreamAudioSourceNode | null>(null);
-    const processorRef = useRef<ScriptProcessorNode | null>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const videoStreamRef = useRef<MediaStream | null>(null);
     const videoIntervalRef = useRef<number | null>(null);
+    const audioStreamRef = useRef<MediaStream | null>(null);
 
     useEffect(() => {
         return () => {
@@ -62,7 +62,7 @@ export const KitchenAssistant: React.FC = () => {
         }
     }
 
-    const startLiveSession = async (personaOverride?: ChefPersonality) => {
+    const startLiveSession = async () => {
         setIsLiveLoading(true);
         setErrorMessage('');
 
@@ -75,49 +75,66 @@ export const KitchenAssistant: React.FC = () => {
                 return;
             }
 
-            // Create audio context for capturing microphone
+            // Create audio context for audio playback
             audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
-                sampleRate: 16000 // Input should be 16kHz
+                sampleRate: 24000
             });
             await audioContextRef.current.resume();
 
             // Get microphone stream
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioStreamRef.current = stream;
 
-            // Create the live session
+            const personaConfig = getPersonalityConfig(personality);
+
+            // Create the live session using the proper SDK implementation
             sessionRef.current = new GeminiLiveSession(apiKey, {
                 onOpen: () => {
                     console.log('Session opened successfully');
                     setIsLiveConnected(true);
                     setIsLiveLoading(false);
 
-                    // Setup audio processing
-                    if (audioContextRef.current) {
-                        const source = audioContextRef.current.createMediaStreamSource(stream);
-                        audioStreamRef.current = source;
+                    // Setup audio capture using MediaRecorder
+                    if (stream && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                        const mediaRecorder = new MediaRecorder(stream, {
+                            mimeType: 'audio/webm;codecs=opus',
+                            audioBitsPerSecond: 128000
+                        });
 
-                        const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
-                        processorRef.current = processor;
+                        mediaRecorderRef.current = mediaRecorder;
 
-                        processor.onaudioprocess = (e) => {
-                            const inputData = e.inputBuffer.getChannelData(0);
+                        // Send audio chunks in real-time
+                        mediaRecorder.ondataavailable = async (event) => {
+                            if (event.data.size > 0 && sessionRef.current) {
+                                try {
+                                    // Convert blob to PCM and send
+                                    const arrayBuffer = await event.data.arrayBuffer();
 
-                            // Calculate volume for visual feedback
-                            let sum = 0;
-                            for (let i = 0; i < inputData.length; i++) {
-                                sum += inputData[i] * inputData[i];
-                            }
-                            const rms = Math.sqrt(sum / inputData.length);
-                            setVolume(Math.min(100, rms * 500));
+                                    // Process as PCM audio chunks
+                                    const tempContext = new AudioContext({ sampleRate: 24000 });
+                                    const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
+                                    const pcmData = audioBuffer.getChannelData(0);
 
-                            // Send audio to session
-                            if (sessionRef.current) {
-                                sessionRef.current.sendAudio(inputData);
+                                    // Calculate volume for visual feedback
+                                    let sum = 0;
+                                    for (let i = 0; i < pcmData.length; i++) {
+                                        sum += pcmData[i] * pcmData[i];
+                                    }
+                                    const rms = Math.sqrt(sum / pcmData.length);
+                                    setVolume(Math.min(100, rms * 500));
+
+                                    // Send audio to session
+                                    sessionRef.current.sendAudio(pcmData);
+
+                                    await tempContext.close();
+                                } catch (error) {
+                                    console.error('Error processing audio:', error);
+                                }
                             }
                         };
 
-                        source.connect(processor);
-                        processor.connect(audioContextRef.current.destination);
+                        // Start recording in chunks
+                        mediaRecorder.start(100); // Record in 100ms chunks
                     }
 
                     // Start video if enabled
@@ -138,7 +155,9 @@ export const KitchenAssistant: React.FC = () => {
                     console.log('Session closed');
                     setIsLiveConnected(false);
                     stopVideoLoop();
-                }
+                },
+                voiceName: personaConfig.voice,
+                systemInstruction: personaConfig.instruction
             });
 
             await sessionRef.current.connect();
@@ -156,17 +175,19 @@ export const KitchenAssistant: React.FC = () => {
         videoIntervalRef.current = window.setInterval(() => {
             const video = videoRef.current;
             const canvas = canvasRef.current;
-            if (video && canvas && video.videoWidth > 0) {
+            if (video && canvas && video.videoWidth > 0 && sessionRef.current) {
                 canvas.width = video.videoWidth / 4;
                 canvas.height = video.videoHeight / 4;
                 const ctx = canvas.getContext('2d');
                 if (ctx) {
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    // For now, we'll skip video sending as it needs proper implementation
-                    // const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+                    const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+
+                    // Send image to session
+                    sessionRef.current.sendImage(base64Data);
                 }
             }
-        }, 1000);
+        }, 1000); // Send 1 frame per second
     };
 
     const stopVideoLoop = () => {
@@ -227,15 +248,25 @@ export const KitchenAssistant: React.FC = () => {
     };
 
     const stopLiveSession = async () => {
-        // Stop audio processing
-        if (processorRef.current) {
-            processorRef.current.disconnect();
-            processorRef.current = null;
+        // Stop media recorder
+        if (mediaRecorderRef.current) {
+            try {
+                if (mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                }
+            } catch (e) {
+                console.error("Error stopping media recorder:", e);
+            }
+            mediaRecorderRef.current = null;
         }
+
+        // Stop audio stream
         if (audioStreamRef.current) {
-            audioStreamRef.current.disconnect();
+            audioStreamRef.current.getTracks().forEach(track => track.stop());
             audioStreamRef.current = null;
         }
+
+        // Close audio context
         if (audioContextRef.current) {
             try {
                 await audioContextRef.current.close();
@@ -254,11 +285,12 @@ export const KitchenAssistant: React.FC = () => {
 
         // Close session
         if (sessionRef.current) {
-            sessionRef.current.disconnect();
+            await sessionRef.current.disconnect();
             sessionRef.current = null;
         }
 
         setIsLiveConnected(false);
+        setVolume(0);
     };
 
     const handlePersonalityChange = (p: ChefPersonality) => {
@@ -267,8 +299,10 @@ export const KitchenAssistant: React.FC = () => {
         setShowPersonaSelector(false);
 
         if (wasConnected) {
-            stopLiveSession();
-            setTimeout(() => startLiveSession(p), 200);
+            stopLiveSession().then(() => {
+                // Restart with new personality
+                setTimeout(() => startLiveSession(), 200);
+            });
         }
     };
 
@@ -333,7 +367,7 @@ export const KitchenAssistant: React.FC = () => {
                             <h2 className="text-2xl font-bold mb-2">AI Chef Assistant</h2>
                             <p className="text-slate-300 mb-8">Ask about substitutions, cooking times, techniques, or show ingredients via camera.</p>
                             <button
-                                onClick={() => startLiveSession()}
+                                onClick={startLiveSession}
                                 disabled={isLiveLoading}
                                 className="w-full py-4 bg-white text-slate-900 rounded-xl font-bold text-lg hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
                             >

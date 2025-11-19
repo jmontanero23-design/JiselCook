@@ -1,35 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Recipe, ChefPersonality } from '../types';
 import { X, ChevronLeft, ChevronRight, Volume2, VolumeX, CheckCircle, Star, Send, Mic, MicOff, Loader2, Camera, UserCog, Heart, Flame, Bot, ChefHat, RefreshCcw } from 'lucide-react';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { GeminiLiveSession } from '../services/liveApiService';
 
 interface CookingModeProps {
     recipe: Recipe;
     onClose: () => void;
 }
 
-// Helper to convert Float32Array to base64 PCM
-function floatTo16BitPCM(float32Array: Float32Array): ArrayBuffer {
-    const buffer = new ArrayBuffer(float32Array.length * 2);
-    const view = new DataView(buffer);
-    let offset = 0;
-    for (let i = 0; i < float32Array.length; i++, offset += 2) {
-        let s = Math.max(-1, Math.min(1, float32Array[i]));
-        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    }
-    return buffer;
-}
-
-function base64EncodeAudio(float32Array: Float32Array): string {
-    const arrayBuffer = floatTo16BitPCM(float32Array);
-    let binary = '';
-    const bytes = new Uint8Array(arrayBuffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return window.btoa(binary);
-}
 
 export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => {
     const [currentStep, setCurrentStep] = useState(0);
@@ -49,13 +27,13 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const sessionRef = useRef<GeminiLiveSession | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
-    const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-    const processorRef = useRef<ScriptProcessorNode | null>(null);
-    const sessionRef = useRef<any>(null);
-    const nextStartTimeRef = useRef<number>(0);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioStreamRef = useRef<MediaStream | null>(null);
     const videoStreamRef = useRef<MediaStream | null>(null);
     const videoIntervalRef = useRef<number | null>(null);
+    const [volume, setVolume] = useState(0);
 
     // Cleanup speech on unmount
     useEffect(() => {
@@ -132,142 +110,112 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
                 return;
             }
 
-            const ai = new GoogleGenAI({ apiKey });
-
-            // Setup Audio Contexts
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-            await audioContext.resume();
-            audioContextRef.current = audioContext;
+            // Setup Audio Context
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
+                sampleRate: 24000
+            });
+            await audioContextRef.current.resume();
 
             // Get Mic Stream
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioStreamRef.current = stream;
 
             const currentPersona = personaOverride || personality;
             const personaConfig = getPersonalityConfig(currentPersona);
 
-            // Connect to Gemini Live
-            const sessionPromise = ai.live.connect({
-                model: 'gemini-2.0-flash-exp',
-                callbacks: {
-                    onopen: () => {
-                        console.log("Live Session Opened");
-                        setIsLiveConnected(true);
-                        setIsLiveLoading(false);
+            // Create the live session using the new service
+            sessionRef.current = new GeminiLiveSession(apiKey, {
+                onOpen: () => {
+                    console.log("Live Session Opened");
+                    setIsLiveConnected(true);
+                    setIsLiveLoading(false);
 
-                        // Wait for the session to be fully established
-                        sessionPromise.then(session => {
-                            sessionRef.current = session;
-
-                            // Start Input Stream (Audio)
-                            const source = audioContext.createMediaStreamSource(stream);
-                            inputSourceRef.current = source;
-
-                            const processor = audioContext.createScriptProcessor(4096, 1, 1);
-                            processorRef.current = processor;
-
-                            processor.onaudioprocess = (e) => {
-                                const inputData = e.inputBuffer.getChannelData(0);
-                                const base64Data = base64EncodeAudio(inputData);
-                                // Use the stored session reference directly
-                                if (sessionRef.current) {
-                                    try {
-                                        sessionRef.current.sendRealtimeInput({
-                                            media: {
-                                                mimeType: 'audio/pcm;rate=24000',
-                                                data: base64Data
-                                            }
-                                        });
-                                    } catch (error) {
-                                        console.error("Error sending audio:", error);
-                                    }
-                                }
-                            };
-
-                            source.connect(processor);
-                            processor.connect(audioContext.destination);
-
-                            // Start Video Loop if enabled
-                            if (isVideoEnabled) {
-                                startVideoLoop(session);
-                            }
-                        }).catch(error => {
-                            console.error("Failed to establish session:", error);
-                            setIsLiveConnected(false);
-                            setIsLiveLoading(false);
+                    // Setup audio capture using MediaRecorder
+                    if (stream && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                        const mediaRecorder = new MediaRecorder(stream, {
+                            mimeType: 'audio/webm;codecs=opus',
+                            audioBitsPerSecond: 128000
                         });
-                    },
-                    onmessage: async (msg: LiveServerMessage) => {
-                        const data = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-                        if (data) {
-                            const binaryString = atob(data);
-                            const len = binaryString.length;
-                            const bytes = new Uint8Array(len);
-                            for (let i = 0; i < len; i++) {
-                                bytes[i] = binaryString.charCodeAt(i);
+
+                        mediaRecorderRef.current = mediaRecorder;
+
+                        // Send audio chunks in real-time
+                        mediaRecorder.ondataavailable = async (event) => {
+                            if (event.data.size > 0 && sessionRef.current) {
+                                try {
+                                    // Convert blob to PCM and send
+                                    const arrayBuffer = await event.data.arrayBuffer();
+
+                                    // Process as PCM audio chunks
+                                    const tempContext = new AudioContext({ sampleRate: 24000 });
+                                    const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
+                                    const pcmData = audioBuffer.getChannelData(0);
+
+                                    // Calculate volume for visual feedback
+                                    let sum = 0;
+                                    for (let i = 0; i < pcmData.length; i++) {
+                                        sum += pcmData[i] * pcmData[i];
+                                    }
+                                    const rms = Math.sqrt(sum / pcmData.length);
+                                    setVolume(Math.min(100, rms * 500));
+
+                                    // Send audio to session
+                                    sessionRef.current.sendAudio(pcmData);
+
+                                    await tempContext.close();
+                                } catch (error) {
+                                    console.error("Error processing audio:", error);
+                                }
                             }
+                        };
 
-                            // Convert 16-bit PCM to Float32
-                            const int16Array = new Int16Array(bytes.buffer);
-                            const float32Data = new Float32Array(int16Array.length);
-                            for (let i = 0; i < int16Array.length; i++) {
-                                float32Data[i] = int16Array[i] / 32768;  // Convert to -1 to 1 range
-                            }
+                        // Start recording in chunks
+                        mediaRecorder.start(100); // Record in 100ms chunks
+                    }
 
-                            const audioBuffer = audioContext.createBuffer(1, float32Data.length, 24000);
-                            audioBuffer.getChannelData(0).set(float32Data);
-
-                            const source = audioContext.createBufferSource();
-                            source.buffer = audioBuffer;
-                            source.connect(audioContext.destination);
-
-                            const currentTime = audioContext.currentTime;
-                            if (nextStartTimeRef.current < currentTime) {
-                                nextStartTimeRef.current = currentTime;
-                            }
-                            source.start(nextStartTimeRef.current);
-                            nextStartTimeRef.current += audioBuffer.duration;
-                        }
-                    },
-                    onclose: () => {
-                        console.log("Live Session Closed");
-                        setIsLiveConnected(false);
-                        stopVideoLoop();
-                    },
-                    onerror: (err) => {
-                        console.error("Live Session Error", err);
-                        setIsLiveConnected(false);
-                        stopVideoLoop();
+                    // Start Video Loop if enabled
+                    if (isVideoEnabled) {
+                        startVideoLoop();
                     }
                 },
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: {
-                        voiceConfig: { prebuiltVoiceConfig: { voiceName: personaConfig.voice } }
-                    },
-                    systemInstruction: `${personaConfig.instruction} 
-                  Recipe: "${recipe.title}". 
-                  Current Step: "${recipe.steps[currentStep].instruction}".`,
-                }
+                onMessage: (msg) => {
+                    console.log('Received message:', msg);
+                },
+                onError: (error) => {
+                    console.error("Live Session Error", error);
+                    setIsLiveConnected(false);
+                    setIsLiveLoading(false);
+                    alert("Connection error. Please try again.");
+                },
+                onClose: () => {
+                    console.log("Live Session Closed");
+                    setIsLiveConnected(false);
+                    stopVideoLoop();
+                },
+                voiceName: personaConfig.voice,
+                systemInstruction: `${personaConfig.instruction}
+                  Recipe: "${recipe.title}".
+                  Current Step: "${recipe.steps[currentStep].instruction}".`
             });
 
-            sessionRef.current = sessionPromise;
+            await sessionRef.current.connect();
 
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
             setIsLiveLoading(false);
-            alert("Could not start voice session. Check microphone permissions.");
+            alert(e.message || "Could not start voice session. Check microphone permissions.");
         }
     };
 
-    const startVideoLoop = (session: any) => {
-        if (!videoRef.current || !canvasRef.current || !session) return;
+    const startVideoLoop = () => {
+        if (!videoRef.current || !canvasRef.current || !sessionRef.current) return;
 
         videoIntervalRef.current = window.setInterval(() => {
             const video = videoRef.current;
             const canvas = canvasRef.current;
             if (!video || !canvas) return;
 
-            if (video.videoWidth > 0 && video.videoHeight > 0) {
+            if (video.videoWidth > 0 && video.videoHeight > 0 && sessionRef.current) {
                 canvas.width = video.videoWidth / 4; // Scale down for performance
                 canvas.height = video.videoHeight / 4;
                 const ctx = canvas.getContext('2d');
@@ -275,16 +223,8 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
 
-                    try {
-                        session.sendRealtimeInput({
-                            media: {
-                                mimeType: 'image/jpeg',
-                                data: base64Data
-                            }
-                        });
-                    } catch (error) {
-                        console.error("Error sending video frame:", error);
-                    }
+                    // Send image to session
+                    sessionRef.current.sendImage(base64Data);
                 }
             }
         }, 1000); // Send 1 frame per second
@@ -320,7 +260,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
 
                 // If live session is already active, start sending frames
                 if (isLiveConnected && sessionRef.current) {
-                    startVideoLoop(sessionRef.current);
+                    startVideoLoop();
                 }
             } catch (e) {
                 console.error("Camera error", e);
@@ -347,7 +287,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
                     videoRef.current.srcObject = stream;
                     videoRef.current.play();
                 }
-                if (isLiveConnected && sessionRef.current) startVideoLoop(sessionRef.current);
+                if (isLiveConnected && sessionRef.current) startVideoLoop();
             } catch (e) {
                 console.error("Failed to switch camera", e);
                 setIsVideoEnabled(false);
@@ -356,14 +296,22 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
     };
 
     const stopLiveSession = async () => {
-        // Disconnect audio processing
-        if (processorRef.current) {
-            processorRef.current.disconnect();
-            processorRef.current = null;
+        // Stop media recorder
+        if (mediaRecorderRef.current) {
+            try {
+                if (mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                }
+            } catch (e) {
+                console.error("Error stopping media recorder:", e);
+            }
+            mediaRecorderRef.current = null;
         }
-        if (inputSourceRef.current) {
-            inputSourceRef.current.disconnect();
-            inputSourceRef.current = null;
+
+        // Stop audio stream
+        if (audioStreamRef.current) {
+            audioStreamRef.current.getTracks().forEach(track => track.stop());
+            audioStreamRef.current = null;
         }
 
         // Properly close audio context (async)
@@ -383,7 +331,14 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
             videoStreamRef.current = null;
         }
 
+        // Disconnect session
+        if (sessionRef.current) {
+            await sessionRef.current.disconnect();
+            sessionRef.current = null;
+        }
+
         setIsLiveConnected(false);
+        setVolume(0);
     };
 
     const toggleLive = () => {
@@ -617,6 +572,13 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
                                     ? "I'm watching your cooking! Ask me: 'Does this look right?'"
                                     : "Ask me for tips, unit conversions, or timers."}
                             </p>
+                            {/* Volume indicator */}
+                            <div className="w-full h-1 bg-blue-200 rounded-full mt-2 overflow-hidden">
+                                <div
+                                    className="h-full bg-blue-500 transition-all duration-75"
+                                    style={{ width: `${volume}%` }}
+                                />
+                            </div>
                         </div>
                     )}
                 </div>
