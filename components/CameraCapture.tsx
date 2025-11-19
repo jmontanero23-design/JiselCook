@@ -39,6 +39,29 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
     }
   };
 
+  const switchCamera = async () => {
+    const newMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newMode);
+
+    // Stop current stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+
+    // Restart with new mode
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: newMode } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (e) {
+      console.error("Error switching camera:", e);
+      setIsCameraOpen(false);
+    }
+  };
+
   const capturePhoto = () => {
     if (videoRef.current) {
       const canvas = document.createElement('canvas');
