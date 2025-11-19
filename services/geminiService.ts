@@ -311,7 +311,7 @@ export async function findCookingResources(recipeTitle: string): Promise<SearchR
         const results: SearchResult[] = [];
 
         if (chunks) {
-            chunks.forEach(chunk => {
+            chunks.forEach((chunk: any) => {
                 if (chunk.web?.uri && chunk.web?.title) {
                     results.push({
                         title: chunk.web.title,
