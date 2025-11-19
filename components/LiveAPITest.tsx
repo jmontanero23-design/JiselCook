@@ -59,10 +59,18 @@ export const LiveAPITest: React.FC = () => {
             setTimeout(() => {
                 addLog('Sending test message...');
                 try {
-                    if (session.send) {
-                        session.send({ text: 'Hello, can you hear me?' });
-                    } else if (session.sendMessage) {
-                        session.sendMessage('Hello, can you hear me?');
+                    const currentSession = session as any;
+                    if (typeof currentSession.send === 'function') {
+                        currentSession.send({
+                            clientContent: {
+                                turns: [{
+                                    role: 'user',
+                                    parts: [{ text: 'Hello, can you hear me?' }]
+                                }],
+                                turnComplete: true
+                            }
+                        });
+                        addLog('✅ Message sent');
                     } else {
                         addLog('⚠️ No send method found on session');
                     }
@@ -86,8 +94,8 @@ export const LiveAPITest: React.FC = () => {
                 <div className="mb-4">
                     <p className="text-lg">Status: <span className={
                         status === 'Connected!' ? 'text-green-600 font-bold' :
-                        status.includes('Failed') ? 'text-red-600 font-bold' :
-                        'text-blue-600'
+                            status.includes('Failed') ? 'text-red-600 font-bold' :
+                                'text-blue-600'
                     }>{status}</span></p>
                 </div>
 
@@ -107,9 +115,9 @@ export const LiveAPITest: React.FC = () => {
                             logs.map((log, i) => (
                                 <div key={i} className={
                                     log.includes('✅') ? 'text-green-700' :
-                                    log.includes('❌') ? 'text-red-700' :
-                                    log.includes('⚠️') ? 'text-yellow-700' :
-                                    'text-gray-700'
+                                        log.includes('❌') ? 'text-red-700' :
+                                            log.includes('⚠️') ? 'text-yellow-700' :
+                                                'text-gray-700'
                                 }>
                                     {log}
                                 </div>
