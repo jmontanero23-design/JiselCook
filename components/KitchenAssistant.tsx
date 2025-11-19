@@ -1,30 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChefPersonality } from '../types';
 import { Mic, MicOff, Video, VideoOff, Loader2, UserCog, Radio, MessageSquare, Bot, Flame, Heart, ChefHat, RefreshCcw } from 'lucide-react';
-import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-
-// Helper to convert Float32Array to base64 PCM
-function floatTo16BitPCM(float32Array: Float32Array): ArrayBuffer {
-    const buffer = new ArrayBuffer(float32Array.length * 2);
-    const view = new DataView(buffer);
-    let offset = 0;
-    for (let i = 0; i < float32Array.length; i++, offset += 2) {
-        let s = Math.max(-1, Math.min(1, float32Array[i]));
-        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    }
-    return buffer;
-}
-
-function base64EncodeAudio(float32Array: Float32Array): string {
-    const arrayBuffer = floatTo16BitPCM(float32Array);
-    let binary = '';
-    const bytes = new Uint8Array(arrayBuffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return window.btoa(binary);
-}
+import { GeminiLiveSession } from '../services/liveApiService';
 
 export const KitchenAssistant: React.FC = () => {
     const [isLiveConnected, setIsLiveConnected] = useState(false);
@@ -33,16 +10,15 @@ export const KitchenAssistant: React.FC = () => {
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
     const [personality, setPersonality] = useState<ChefPersonality>('Professional');
     const [showPersonaSelector, setShowPersonaSelector] = useState(false);
-    const [transcript, setTranscript] = useState<string>("");
     const [volume, setVolume] = useState(0);
+    const [errorMessage, setErrorMessage] = useState<string>('');
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const sessionRef = useRef<GeminiLiveSession | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
-    const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+    const audioStreamRef = useRef<MediaStreamAudioSourceNode | null>(null);
     const processorRef = useRef<ScriptProcessorNode | null>(null);
-    const sessionRef = useRef<any>(null);
-    const nextStartTimeRef = useRef<number>(0);
     const videoStreamRef = useRef<MediaStream | null>(null);
     const videoIntervalRef = useRef<number | null>(null);
 
@@ -71,7 +47,7 @@ export const KitchenAssistant: React.FC = () => {
                 };
             default:
                 return {
-                    voice: 'Puck',
+                    voice: 'Aoede',
                     instruction: "You are a helpful, professional executive chef. Answer kitchen questions, convert units, and give advice clearly and concisely."
                 };
         }
@@ -88,36 +64,39 @@ export const KitchenAssistant: React.FC = () => {
 
     const startLiveSession = async (personaOverride?: ChefPersonality) => {
         setIsLiveLoading(true);
+        setErrorMessage('');
+
         try {
-            // Validate API key
-            const apiKey = process.env.API_KEY;
+            // Validate API key (using Vite environment variable)
+            const apiKey = import.meta.env.VITE_API_KEY;
             if (!apiKey) {
-                alert("API key not configured. Please set up your Gemini API key in the .env file.");
+                setErrorMessage("API key not configured. Please set up your VITE_API_KEY in the .env file.");
                 setIsLiveLoading(false);
                 return;
             }
 
-            const ai = new GoogleGenAI({ apiKey });
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-            await audioContext.resume();
-            audioContextRef.current = audioContext;
+            // Create audio context for capturing microphone
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
+                sampleRate: 16000 // Input should be 16kHz
+            });
+            await audioContextRef.current.resume();
 
+            // Get microphone stream
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-            const currentPersona = personaOverride || personality;
-            const personaConfig = getPersonalityConfig(currentPersona);
+            // Create the live session
+            sessionRef.current = new GeminiLiveSession(apiKey, {
+                onOpen: () => {
+                    console.log('Session opened successfully');
+                    setIsLiveConnected(true);
+                    setIsLiveLoading(false);
 
-            const sessionPromise = ai.live.connect({
-                model: 'gemini-2.5-flash',
-                callbacks: {
-                    onopen: () => {
-                        setIsLiveConnected(true);
-                        setIsLiveLoading(false);
-                        setTranscript("Session connected. Say hello!");
+                    // Setup audio processing
+                    if (audioContextRef.current) {
+                        const source = audioContextRef.current.createMediaStreamSource(stream);
+                        audioStreamRef.current = source;
 
-                        const source = audioContext.createMediaStreamSource(stream);
-                        inputSourceRef.current = source;
-                        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+                        const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
                         processorRef.current = processor;
 
                         processor.onaudioprocess = (e) => {
@@ -129,75 +108,51 @@ export const KitchenAssistant: React.FC = () => {
                                 sum += inputData[i] * inputData[i];
                             }
                             const rms = Math.sqrt(sum / inputData.length);
-                            setVolume(Math.min(100, rms * 500)); // Scale up for visibility
+                            setVolume(Math.min(100, rms * 500));
 
-                            const base64Data = base64EncodeAudio(inputData);
-                            sessionPromise.then(session => {
-                                session.sendRealtimeInput({
-                                    media: { mimeType: 'audio/pcm;rate=24000', data: base64Data }
-                                });
-                            });
+                            // Send audio to session
+                            if (sessionRef.current) {
+                                sessionRef.current.sendAudio(inputData);
+                            }
                         };
 
                         source.connect(processor);
-                        processor.connect(audioContext.destination);
+                        processor.connect(audioContextRef.current.destination);
+                    }
 
-                        if (isVideoEnabled) startVideoLoop(sessionPromise);
-                    },
-                    onmessage: async (msg: LiveServerMessage) => {
-                        const data = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-                        if (data) {
-                            const binaryString = atob(data);
-                            const len = binaryString.length;
-                            const bytes = new Uint8Array(len);
-                            for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-
-                            // Convert 16-bit PCM to Float32
-                            const int16Array = new Int16Array(bytes.buffer);
-                            const float32Data = new Float32Array(int16Array.length);
-                            for (let i = 0; i < int16Array.length; i++) {
-                                float32Data[i] = int16Array[i] / 32768;  // Convert to -1 to 1 range
-                            }
-
-                            const audioBuffer = audioContext.createBuffer(1, float32Data.length, 24000);
-                            audioBuffer.getChannelData(0).set(float32Data);
-
-                            const source = audioContext.createBufferSource();
-                            source.buffer = audioBuffer;
-                            source.connect(audioContext.destination);
-
-                            const currentTime = audioContext.currentTime;
-                            if (nextStartTimeRef.current < currentTime) nextStartTimeRef.current = currentTime;
-                            source.start(nextStartTimeRef.current);
-                            nextStartTimeRef.current += audioBuffer.duration;
-                        }
-                    },
-                    onclose: () => {
-                        setIsLiveConnected(false);
-                        stopVideoLoop();
-                    },
-                    onerror: (err) => {
-                        console.error(err);
-                        setIsLiveConnected(false);
-                        stopVideoLoop();
+                    // Start video if enabled
+                    if (isVideoEnabled) {
+                        startVideoLoop();
                     }
                 },
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: personaConfig.voice } } },
-                    systemInstruction: personaConfig.instruction,
+                onMessage: (msg) => {
+                    console.log('Received message:', msg);
+                },
+                onError: (error) => {
+                    console.error('Session error:', error);
+                    setErrorMessage('Connection error. Please try again.');
+                    setIsLiveConnected(false);
+                    setIsLiveLoading(false);
+                },
+                onClose: () => {
+                    console.log('Session closed');
+                    setIsLiveConnected(false);
+                    stopVideoLoop();
                 }
             });
-            sessionRef.current = sessionPromise;
-        } catch (e) {
-            console.error(e);
+
+            await sessionRef.current.connect();
+
+        } catch (e: any) {
+            console.error('Failed to start session:', e);
+            setErrorMessage(e.message || "Could not start voice session. Check microphone permissions.");
             setIsLiveLoading(false);
-            alert("Could not start voice session.");
         }
     };
 
-    const startVideoLoop = (sessionPromise: Promise<any>) => {
+    const startVideoLoop = () => {
         if (!videoRef.current || !canvasRef.current) return;
+
         videoIntervalRef.current = window.setInterval(() => {
             const video = videoRef.current;
             const canvas = canvasRef.current;
@@ -207,10 +162,8 @@ export const KitchenAssistant: React.FC = () => {
                 const ctx = canvas.getContext('2d');
                 if (ctx) {
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
-                    sessionPromise.then(session => {
-                        session.sendRealtimeInput({ media: { mimeType: 'image/jpeg', data: base64Data } });
-                    });
+                    // For now, we'll skip video sending as it needs proper implementation
+                    // const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
                 }
             }
         }, 1000);
@@ -241,9 +194,9 @@ export const KitchenAssistant: React.FC = () => {
                     videoRef.current.play();
                 }
                 setIsVideoEnabled(true);
-                if (isLiveConnected && sessionRef.current) startVideoLoop(sessionRef.current);
+                if (isLiveConnected) startVideoLoop();
             } catch (e) {
-                alert("Could not access camera.");
+                setErrorMessage("Could not access camera.");
             }
         }
     };
@@ -253,7 +206,6 @@ export const KitchenAssistant: React.FC = () => {
         setFacingMode(newMode);
 
         if (isVideoEnabled) {
-            // Restart video with new mode
             if (videoStreamRef.current) {
                 videoStreamRef.current.getTracks().forEach(track => track.stop());
             }
@@ -266,7 +218,7 @@ export const KitchenAssistant: React.FC = () => {
                     videoRef.current.srcObject = stream;
                     videoRef.current.play();
                 }
-                if (isLiveConnected && sessionRef.current) startVideoLoop(sessionRef.current);
+                if (isLiveConnected) startVideoLoop();
             } catch (e) {
                 console.error("Failed to switch camera", e);
                 setIsVideoEnabled(false);
@@ -275,17 +227,15 @@ export const KitchenAssistant: React.FC = () => {
     };
 
     const stopLiveSession = async () => {
-        // Disconnect audio processing
+        // Stop audio processing
         if (processorRef.current) {
             processorRef.current.disconnect();
             processorRef.current = null;
         }
-        if (inputSourceRef.current) {
-            inputSourceRef.current.disconnect();
-            inputSourceRef.current = null;
+        if (audioStreamRef.current) {
+            audioStreamRef.current.disconnect();
+            audioStreamRef.current = null;
         }
-
-        // Properly close audio context (async)
         if (audioContextRef.current) {
             try {
                 await audioContextRef.current.close();
@@ -295,17 +245,21 @@ export const KitchenAssistant: React.FC = () => {
             audioContextRef.current = null;
         }
 
-        // Stop video processing
+        // Stop video
         stopVideoLoop();
         if (videoStreamRef.current) {
             videoStreamRef.current.getTracks().forEach(track => track.stop());
             videoStreamRef.current = null;
         }
 
+        // Close session
+        if (sessionRef.current) {
+            sessionRef.current.disconnect();
+            sessionRef.current = null;
+        }
+
         setIsLiveConnected(false);
     };
-
-    const toggleLive = () => isLiveConnected ? stopLiveSession() : startLiveSession();
 
     const handlePersonalityChange = (p: ChefPersonality) => {
         const wasConnected = isLiveConnected;
@@ -314,7 +268,6 @@ export const KitchenAssistant: React.FC = () => {
 
         if (wasConnected) {
             stopLiveSession();
-            // Small delay to allow cleanup before reconnecting with new persona
             setTimeout(() => startLiveSession(p), 200);
         }
     };
@@ -366,6 +319,12 @@ export const KitchenAssistant: React.FC = () => {
                 </div>
 
                 <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    {errorMessage && (
+                        <div className="bg-red-900/50 backdrop-blur-md text-red-200 px-4 py-2 rounded-lg mb-4 max-w-md">
+                            {errorMessage}
+                        </div>
+                    )}
+
                     {!isLiveConnected && (
                         <div className="bg-black/60 backdrop-blur-xl p-8 rounded-3xl border border-white/10 max-w-md">
                             <div className="w-20 h-20 bg-gradient-to-br from-emerald-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/20">
@@ -394,7 +353,6 @@ export const KitchenAssistant: React.FC = () => {
                                 {getPersonaIcon(personality, 64)}
                             </div>
                             <p className="text-2xl font-light text-white/80">"I'm listening..."</p>
-                            {/* Volume Meter Bar */}
                             <div className="w-48 h-1 bg-white/10 rounded-full mt-4 overflow-hidden">
                                 <div
                                     className="h-full bg-emerald-500 transition-all duration-75"

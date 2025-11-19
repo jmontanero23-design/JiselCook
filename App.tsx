@@ -10,7 +10,8 @@ import { MealPlanner } from './components/MealPlanner';
 import { KitchenAssistant } from './components/KitchenAssistant';
 import { ShoppingList } from './components/ShoppingList';
 import { Cookbook } from './components/Cookbook';
-import { analyzeFridgeAndSuggestRecipes, generateRecipeImage, generateSurpriseRecipe } from './services/geminiService';
+import { analyzeFridgeAndSuggestRecipes, generateSurpriseRecipe } from './services/geminiService';
+import { generateRecipeImage } from './services/imageService';
 import { Recipe, DietaryRestriction, UserProfile, Badge } from './types';
 import { Menu, ChefHat } from 'lucide-react';
 

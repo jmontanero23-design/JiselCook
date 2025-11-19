@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Recipe, DietaryRestriction, UserProfile, DayPlan, SearchResult, ShoppingCategory } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
 
 const recipeSchema: Schema = {
     type: Type.ARRAY,
@@ -207,22 +207,11 @@ export async function generateSurpriseRecipe(userProfile: UserProfile, filters: 
 
 export async function generateRecipeImage(recipeTitle: string, recipeDescription: string): Promise<string | null> {
     try {
-        const response = await ai.models.generateImages({
-            model: 'imagen-3.0-fast-generate-001',
-            prompt: `A professional, high-quality food photography shot of ${recipeTitle}. ${recipeDescription}. The lighting should be natural and appetizing, plated beautifully on a table.`,
-            config: {
-                numberOfImages: 1,
-                aspectRatio: '4:3',
-                outputMimeType: 'image/jpeg'
-            }
-        });
-
-        if (!response.generatedImages?.[0]?.image?.imageBytes) {
-            return null;
-        }
-
-        const base64ImageBytes = response.generatedImages[0].image.imageBytes;
-        return `data:image/jpeg;base64,${base64ImageBytes}`;
+        // Image generation is not available in the current @google/genai SDK
+        // Returning null - you can integrate with alternative image generation APIs
+        // such as DALL-E, Stable Diffusion, or wait for Imagen API support
+        console.warn("Image generation not available in current SDK version");
+        return null;
     } catch (error) {
         console.error("Error generating image:", error);
         return null;

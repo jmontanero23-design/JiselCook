@@ -124,10 +124,10 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
     const startLiveSession = async (personaOverride?: ChefPersonality) => {
         setIsLiveLoading(true);
         try {
-            // Validate API key
-            const apiKey = process.env.API_KEY;
+            // Validate API key - using Vite environment variable
+            const apiKey = import.meta.env.VITE_API_KEY;
             if (!apiKey) {
-                alert("API key not configured. Please set up your Gemini API key in the .env file.");
+                alert("API key not configured. Please set up your Gemini API key in the .env file as VITE_API_KEY.");
                 setIsLiveLoading(false);
                 return;
             }
@@ -147,40 +147,54 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
 
             // Connect to Gemini Live
             const sessionPromise = ai.live.connect({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-2.0-flash-exp',
                 callbacks: {
                     onopen: () => {
                         console.log("Live Session Opened");
                         setIsLiveConnected(true);
                         setIsLiveLoading(false);
 
-                        // Start Input Stream (Audio)
-                        const source = audioContext.createMediaStreamSource(stream);
-                        inputSourceRef.current = source;
+                        // Wait for the session to be fully established
+                        sessionPromise.then(session => {
+                            sessionRef.current = session;
 
-                        const processor = audioContext.createScriptProcessor(4096, 1, 1);
-                        processorRef.current = processor;
+                            // Start Input Stream (Audio)
+                            const source = audioContext.createMediaStreamSource(stream);
+                            inputSourceRef.current = source;
 
-                        processor.onaudioprocess = (e) => {
-                            const inputData = e.inputBuffer.getChannelData(0);
-                            const base64Data = base64EncodeAudio(inputData);
-                            sessionPromise.then(session => {
-                                session.sendRealtimeInput({
-                                    media: {
-                                        mimeType: 'audio/pcm;rate=24000',
-                                        data: base64Data
+                            const processor = audioContext.createScriptProcessor(4096, 1, 1);
+                            processorRef.current = processor;
+
+                            processor.onaudioprocess = (e) => {
+                                const inputData = e.inputBuffer.getChannelData(0);
+                                const base64Data = base64EncodeAudio(inputData);
+                                // Use the stored session reference directly
+                                if (sessionRef.current) {
+                                    try {
+                                        sessionRef.current.sendRealtimeInput({
+                                            media: {
+                                                mimeType: 'audio/pcm;rate=24000',
+                                                data: base64Data
+                                            }
+                                        });
+                                    } catch (error) {
+                                        console.error("Error sending audio:", error);
                                     }
-                                });
-                            });
-                        };
+                                }
+                            };
 
-                        source.connect(processor);
-                        processor.connect(audioContext.destination);
+                            source.connect(processor);
+                            processor.connect(audioContext.destination);
 
-                        // Start Video Loop if enabled
-                        if (isVideoEnabled) {
-                            startVideoLoop(sessionPromise);
-                        }
+                            // Start Video Loop if enabled
+                            if (isVideoEnabled) {
+                                startVideoLoop(session);
+                            }
+                        }).catch(error => {
+                            console.error("Failed to establish session:", error);
+                            setIsLiveConnected(false);
+                            setIsLiveLoading(false);
+                        });
                     },
                     onmessage: async (msg: LiveServerMessage) => {
                         const data = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
@@ -245,8 +259,8 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
         }
     };
 
-    const startVideoLoop = (sessionPromise: Promise<any>) => {
-        if (!videoRef.current || !canvasRef.current) return;
+    const startVideoLoop = (session: any) => {
+        if (!videoRef.current || !canvasRef.current || !session) return;
 
         videoIntervalRef.current = window.setInterval(() => {
             const video = videoRef.current;
@@ -261,14 +275,16 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
 
-                    sessionPromise.then(session => {
+                    try {
                         session.sendRealtimeInput({
                             media: {
                                 mimeType: 'image/jpeg',
                                 data: base64Data
                             }
                         });
-                    });
+                    } catch (error) {
+                        console.error("Error sending video frame:", error);
+                    }
                 }
             }
         }, 1000); // Send 1 frame per second
