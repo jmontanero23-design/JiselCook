@@ -4,95 +4,95 @@ import { Recipe, DietaryRestriction, UserProfile, DayPlan, SearchResult, Shoppin
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const recipeSchema: Schema = {
-  type: Type.ARRAY,
-  items: {
-    type: Type.OBJECT,
-    properties: {
-      title: { type: Type.STRING },
-      description: { type: Type.STRING },
-      difficulty: { type: Type.STRING, enum: ['Easy', 'Medium', 'Hard'] },
-      prepTimeMinutes: { type: Type.INTEGER },
-      calories: { type: Type.INTEGER },
-      rating: { type: Type.NUMBER, description: "A mock average rating between 3.5 and 5.0" },
-      reviewCount: { type: Type.INTEGER, description: "A mock review count" },
-      ingredients: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            name: { type: Type.STRING },
-            amount: { type: Type.STRING },
-            isMissing: { type: Type.BOOLEAN, description: "For surprise recipes, assume the user needs to buy main proteins/produce but has staples." }
-          },
-          required: ['name', 'isMissing']
-        }
-      },
-      steps: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            stepNumber: { type: Type.INTEGER },
-            instruction: { type: Type.STRING }
-          },
-          required: ['stepNumber', 'instruction']
-        }
-      },
-      tags: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING }
-      },
-      drinkPairing: {
+    type: Type.ARRAY,
+    items: {
         type: Type.OBJECT,
         properties: {
-            name: { type: Type.STRING },
+            title: { type: Type.STRING },
             description: { type: Type.STRING },
-            type: { type: Type.STRING, enum: ['Wine', 'Beer', 'Cocktail', 'Non-Alcoholic'] }
+            difficulty: { type: Type.STRING, enum: ['Easy', 'Medium', 'Hard'] },
+            prepTimeMinutes: { type: Type.INTEGER },
+            calories: { type: Type.INTEGER },
+            rating: { type: Type.NUMBER, description: "A mock average rating between 3.5 and 5.0" },
+            reviewCount: { type: Type.INTEGER, description: "A mock review count" },
+            ingredients: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        name: { type: Type.STRING },
+                        amount: { type: Type.STRING },
+                        isMissing: { type: Type.BOOLEAN, description: "For surprise recipes, assume the user needs to buy main proteins/produce but has staples." }
+                    },
+                    required: ['name', 'isMissing']
+                }
+            },
+            steps: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        stepNumber: { type: Type.INTEGER },
+                        instruction: { type: Type.STRING }
+                    },
+                    required: ['stepNumber', 'instruction']
+                }
+            },
+            tags: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+            },
+            drinkPairing: {
+                type: Type.OBJECT,
+                properties: {
+                    name: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    type: { type: Type.STRING, enum: ['Wine', 'Beer', 'Cocktail', 'Non-Alcoholic'] }
+                },
+                required: ['name', 'description', 'type']
+            },
+            flavorProfile: {
+                type: Type.OBJECT,
+                description: "Score from 0 to 10 for each flavor aspect",
+                properties: {
+                    sweet: { type: Type.INTEGER },
+                    salty: { type: Type.INTEGER },
+                    sour: { type: Type.INTEGER },
+                    bitter: { type: Type.INTEGER },
+                    spicy: { type: Type.INTEGER },
+                    umami: { type: Type.INTEGER }
+                },
+                required: ['sweet', 'salty', 'sour', 'bitter', 'spicy', 'umami']
+            }
         },
-        required: ['name', 'description', 'type']
-      },
-      flavorProfile: {
-        type: Type.OBJECT,
-        description: "Score from 0 to 10 for each flavor aspect",
-        properties: {
-            sweet: { type: Type.INTEGER },
-            salty: { type: Type.INTEGER },
-            sour: { type: Type.INTEGER },
-            bitter: { type: Type.INTEGER },
-            spicy: { type: Type.INTEGER },
-            umami: { type: Type.INTEGER }
-        },
-        required: ['sweet', 'salty', 'sour', 'bitter', 'spicy', 'umami']
-      }
-    },
-    required: ['title', 'difficulty', 'prepTimeMinutes', 'calories', 'ingredients', 'steps', 'rating', 'reviewCount', 'drinkPairing', 'flavorProfile']
-  }
+        required: ['title', 'difficulty', 'prepTimeMinutes', 'calories', 'ingredients', 'steps', 'rating', 'reviewCount', 'drinkPairing', 'flavorProfile']
+    }
 };
 
 export async function analyzeFridgeAndSuggestRecipes(
-  base64Image: string,
-  mimeType: string,
-  filters: DietaryRestriction[],
-  pantryItems: string[],
-  userProfile: UserProfile
+    base64Image: string,
+    mimeType: string,
+    filters: DietaryRestriction[],
+    pantryItems: string[],
+    userProfile: UserProfile
 ): Promise<Recipe[]> {
-  try {
-    const filtersText = filters.length > 0 
-      ? `Strictly adhere to these dietary restrictions: ${filters.join(', ')}.` 
-      : 'No specific dietary restrictions.';
+    try {
+        const filtersText = filters.length > 0
+            ? `Strictly adhere to these dietary restrictions: ${filters.join(', ')}.`
+            : 'No specific dietary restrictions.';
 
-    const pantryText = pantryItems.length > 0
-      ? `The user has these items in their pantry: ${pantryItems.join(', ')}. You can use these to complete recipes.`
-      : 'The user has an empty pantry.';
+        const pantryText = pantryItems.length > 0
+            ? `The user has these items in their pantry: ${pantryItems.join(', ')}. You can use these to complete recipes.`
+            : 'The user has an empty pantry.';
 
-    const profileText = `
+        const profileText = `
       User Profile:
       - Skill Level: ${userProfile.skillLevel} (Adjust recipe complexity accordingly).
       - Preferred Cuisines: ${userProfile.preferredCuisines.length > 0 ? userProfile.preferredCuisines.join(', ') : 'No preference'}.
       - Disliked Ingredients/Allergies (DO NOT USE THESE): ${userProfile.dislikes.length > 0 ? userProfile.dislikes.join(', ') : 'None'}.
     `;
 
-    const prompt = `
+        const prompt = `
       Analyze this image of a refrigerator or food items. 
       1. Identify the visible ingredients.
       2. Suggest 4-6 distinct, delicious recipes that can be made primarily with the visible ingredients AND the pantry items provided.
@@ -106,51 +106,51 @@ export async function analyzeFridgeAndSuggestRecipes(
       10. Analyze the flavor profile (0-10 scale for sweet, salty, etc).
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: base64Image,
-              mimeType: mimeType
+        const response = await ai.models.generateContent({
+            model: 'gemini-1.5-pro',
+            contents: {
+                parts: [
+                    {
+                        inlineData: {
+                            data: base64Image,
+                            mimeType: mimeType
+                        }
+                    },
+                    {
+                        text: prompt
+                    }
+                ]
+            },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: recipeSchema,
+                systemInstruction: "You are a world-class chef and culinary assistant. Generate precise, structured JSON data."
             }
-          },
-          {
-            text: prompt
-          }
-        ]
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: recipeSchema,
-        systemInstruction: "You are a world-class chef and culinary assistant. Generate precise, structured JSON data."
-      }
-    });
+        });
 
-    const jsonText = response.text;
-    if (!jsonText) return [];
+        const jsonText = response.text;
+        if (!jsonText) return [];
 
-    const recipesRaw = JSON.parse(jsonText) as Omit<Recipe, 'id'>[];
-    
-    // Add client-side IDs
-    return recipesRaw.map((r, index) => ({
-      ...r,
-      id: `recipe-${Date.now()}-${index}`
-    }));
+        const recipesRaw = JSON.parse(jsonText) as Omit<Recipe, 'id'>[];
 
-  } catch (error) {
-    console.error("Error calling Gemini:", error);
-    throw error;
-  }
+        // Add client-side IDs
+        return recipesRaw.map((r, index) => ({
+            ...r,
+            id: `recipe-${Date.now()}-${index}`
+        }));
+
+    } catch (error) {
+        console.error("Error calling Gemini:", error);
+        throw error;
+    }
 }
 
 export async function generateSurpriseRecipe(userProfile: UserProfile, filters: DietaryRestriction[]): Promise<Recipe[]> {
     try {
-        const filtersText = filters.length > 0 
-            ? `Strictly adhere to these dietary restrictions: ${filters.join(', ')}.` 
+        const filtersText = filters.length > 0
+            ? `Strictly adhere to these dietary restrictions: ${filters.join(', ')}.`
             : 'No specific dietary restrictions.';
-            
+
         const profileText = `
           User Profile:
           - Skill Level: ${userProfile.skillLevel}.
@@ -169,7 +169,7 @@ export async function generateSurpriseRecipe(userProfile: UserProfile, filters: 
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-1.5-pro',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -195,7 +195,7 @@ export async function generateSurpriseRecipe(userProfile: UserProfile, filters: 
 export async function generateRecipeImage(recipeTitle: string, recipeDescription: string): Promise<string | null> {
     try {
         const response = await ai.models.generateImages({
-            model: 'imagen-4.0-generate-001',
+            model: 'imagen-3.0-generate-001',
             prompt: `A professional, high-quality food photography shot of ${recipeTitle}. ${recipeDescription}. The lighting should be natural and appetizing, plated beautifully on a table.`,
             config: {
                 numberOfImages: 1,
@@ -203,11 +203,11 @@ export async function generateRecipeImage(recipeTitle: string, recipeDescription
                 outputMimeType: 'image/jpeg'
             }
         });
-        
+
         if (!response.generatedImages?.[0]?.image?.imageBytes) {
             return null;
         }
-        
+
         const base64ImageBytes = response.generatedImages[0].image.imageBytes;
         return `data:image/jpeg;base64,${base64ImageBytes}`;
     } catch (error) {
@@ -228,22 +228,22 @@ export async function remixRecipe(originalRecipe: Recipe, modification: string):
         Keep the same JSON structure.
         Return ONLY the single modified recipe object.
     `;
-    
+
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-1.5-pro',
         contents: prompt,
         config: {
             responseMimeType: "application/json",
-            responseSchema: recipeSchema, 
+            responseSchema: recipeSchema,
         }
     });
-    
+
     const jsonText = response.text;
     if (!jsonText) throw new Error("No data returned");
-    
+
     const recipes = JSON.parse(jsonText) as Omit<Recipe, 'id'>[];
     if (recipes.length === 0) throw new Error("Failed to modify recipe");
-    
+
     return {
         ...recipes[0],
         id: originalRecipe.id + '-remix-' + Date.now()
@@ -260,7 +260,7 @@ export async function generateMealPlan(ingredients: string[], userProfile: UserP
         
         Goal: Minimize food waste and use the available ingredients creatively.
     `;
-    
+
     const mealPlanSchema: Schema = {
         type: Type.ARRAY,
         items: {
@@ -286,21 +286,21 @@ export async function generateMealPlan(ingredients: string[], userProfile: UserP
     };
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-1.5-pro',
         contents: prompt,
         config: {
             responseMimeType: "application/json",
             responseSchema: mealPlanSchema
         }
     });
-    
+
     return JSON.parse(response.text || '[]');
 }
 
 export async function findCookingResources(recipeTitle: string): Promise<SearchResult[]> {
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-1.5-flash",
             contents: `Find top-rated video tutorials, blog posts, or cooking guides for the recipe: "${recipeTitle}". Focus on reputable food sources.`,
             config: {
                 tools: [{ googleSearch: {} }],
@@ -320,7 +320,7 @@ export async function findCookingResources(recipeTitle: string): Promise<SearchR
                 }
             });
         }
-        
+
         return Array.from(new Set(results.map(r => r.uri)))
             .map(uri => results.find(r => r.uri === uri)!)
             .slice(0, 5);
@@ -345,12 +345,12 @@ export async function getNutritionalInsights(recipe: Recipe): Promise<string> {
         
         Format the output as a clean Markdown list.
     `;
-    
+
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-1.5-pro',
         contents: prompt,
     });
-    
+
     return response.text || "Analysis unavailable.";
 }
 
@@ -375,14 +375,14 @@ export async function organizeShoppingList(items: string[]): Promise<ShoppingCat
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-1.5-pro',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
                 responseSchema: schema
             }
         });
-        
+
         return JSON.parse(response.text || '[]');
     } catch (error) {
         console.error("Error organizing shopping list:", error);
@@ -403,7 +403,7 @@ export async function processShoppingVoiceCommand(base64Audio: string, mimeType:
         Return a JSON object with a list of commands.
         Example: "Add apples and bananas, remove milk" -> [{action: 'add', item: 'apples'}, {action: 'add', item: 'bananas'}, {action: 'remove', item: 'milk'}]
     `;
-    
+
     const schema: Schema = {
         type: Type.OBJECT,
         properties: {
@@ -424,7 +424,7 @@ export async function processShoppingVoiceCommand(base64Audio: string, mimeType:
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-1.5-flash',
             contents: {
                 parts: [
                     {
