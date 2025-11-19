@@ -449,3 +449,35 @@ export async function processShoppingVoiceCommand(base64Audio: string, mimeType:
         return [];
     }
 }
+
+export async function identifyIngredientsFromImage(base64Image: string): Promise<string[]> {
+    try {
+        const prompt = `
+            Identify the visible food ingredients in this image.
+            Return a simple JSON array of strings, e.g., ["Apple", "Milk", "Eggs"].
+            Only list distinct, recognizable food items.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: {
+                parts: [
+                    { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
+                    { text: prompt }
+                ]
+            },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                }
+            }
+        });
+
+        return JSON.parse(response.text || '[]');
+    } catch (e) {
+        console.error("Error identifying ingredients:", e);
+        return [];
+    }
+}

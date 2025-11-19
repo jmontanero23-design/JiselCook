@@ -1,13 +1,15 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, Upload, Loader2, Image as ImageIcon, Sparkles, ScanLine, RefreshCcw } from 'lucide-react';
+import { identifyIngredientsFromImage } from '../services/geminiService';
 
 interface CameraCaptureProps {
   onImageCaptured: (file: File) => void;
   onSurpriseMe: () => void;
   isLoading: boolean;
+  onIngredientsDetected?: (ingredients: string[]) => void;
 }
 
-export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, onSurpriseMe, isLoading }) => {
+export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, onSurpriseMe, isLoading, onIngredientsDetected }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -100,19 +102,26 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-          // In a real app, we'd send this to Gemini Flash for quick labeling
-          // For now, we'll simulate "Scanning..." to show the UI works
-          // To make this real, we'd need to expose a new service method for "quick label"
-          setLiveLabel("Scanning ingredients...");
+          const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
 
-          // Simulate a result every few seconds
-          if (Math.random() > 0.7) {
-            const labels = ["Fresh Vegetables", "Dairy Products", "Fruits", "Condiments", "Leftovers"];
-            setLiveLabel(labels[Math.floor(Math.random() * labels.length)]);
+          setLiveLabel("Scanning...");
+
+          try {
+            const ingredients = await identifyIngredientsFromImage(base64Data);
+            if (ingredients.length > 0) {
+              setLiveLabel(`Found: ${ingredients.join(', ')}`);
+              if (onIngredientsDetected) {
+                onIngredientsDetected(ingredients);
+              }
+            } else {
+              setLiveLabel("Scanning...");
+            }
+          } catch (e) {
+            console.error("Quick scan failed", e);
           }
         }
       }
-    }, 2000);
+    }, 3000); // Scan every 3 seconds
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

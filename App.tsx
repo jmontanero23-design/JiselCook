@@ -28,7 +28,7 @@ export default function App() {
   const [isCooking, setIsCooking] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilters, setActiveFilters] = useState<DietaryRestriction[]>([]);
-  
+
   // Mobile Sidebar State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -37,7 +37,7 @@ export default function App() {
     const saved = localStorage.getItem(STORAGE_KEYS.SHOPPING);
     return saved ? JSON.parse(saved) : [];
   });
-  
+
   const [pantry, setPantry] = useState<string[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PANTRY);
     return saved ? JSON.parse(saved) : ['Salt', 'Pepper', 'Olive Oil'];
@@ -75,43 +75,43 @@ export default function App() {
   };
 
   const handleSurpriseMe = async () => {
-      setIsLoading(true);
-      setView('home');
-      try {
-          const surpriseRecipes = await generateSurpriseRecipe(userProfile, activeFilters);
-          setRecipes(surpriseRecipes);
-          setView('recipes');
-          
-          surpriseRecipes.forEach(async (recipe) => {
-            try {
-              const imageUrl = await generateRecipeImage(recipe.title, recipe.description);
-              if (imageUrl) {
-                setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...r, imageUrl } : r));
-              }
-            } catch (e) {
-              console.error(`Failed to generate image for ${recipe.title}`, e);
-            }
-          });
+    setIsLoading(true);
+    setView('home');
+    try {
+      const surpriseRecipes = await generateSurpriseRecipe(userProfile, activeFilters);
+      setRecipes(surpriseRecipes);
+      setView('recipes');
 
-      } catch (e) {
-          console.error("Failed to generate surprise recipe", e);
-          alert("Chef is busy! Try again.");
-      } finally {
-          setIsLoading(false);
-      }
+      surpriseRecipes.forEach(async (recipe) => {
+        try {
+          const imageUrl = await generateRecipeImage(recipe.title, recipe.description);
+          if (imageUrl) {
+            setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...r, imageUrl } : r));
+          }
+        } catch (e) {
+          console.error(`Failed to generate image for ${recipe.title}`, e);
+        }
+      });
+
+    } catch (e) {
+      console.error("Failed to generate surprise recipe", e);
+      alert("Chef is busy! Try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleImageCaptured = async (file: File) => {
     setIsLoading(true);
     setView('home');
-    
+
     const readFile = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
     };
 
     try {
@@ -120,16 +120,16 @@ export default function App() {
       const mimeType = file.type;
 
       const suggestedRecipes = await analyzeFridgeAndSuggestRecipes(
-        base64Data, 
+        base64Data,
         mimeType,
         activeFilters,
         pantry,
         userProfile
       );
-      
+
       setRecipes(suggestedRecipes);
       setView('recipes');
-      
+
       suggestedRecipes.forEach(async (recipe) => {
         try {
           const imageUrl = await generateRecipeImage(recipe.title, recipe.description);
@@ -149,9 +149,19 @@ export default function App() {
     }
   };
 
+  const handleIngredientsDetected = (ingredients: string[]) => {
+    setPantry(prev => {
+      const newItems = ingredients.filter(i => !prev.includes(i));
+      if (newItems.length === 0) return prev;
+      // Optional: Notify user
+      // console.log("Added to pantry:", newItems);
+      return [...prev, ...newItems];
+    });
+  };
+
   const handleToggleFilter = (filter: DietaryRestriction) => {
-    setActiveFilters(prev => 
-      prev.includes(filter) 
+    setActiveFilters(prev =>
+      prev.includes(filter)
         ? prev.filter(f => f !== filter)
         : [...prev, filter]
     );
@@ -178,65 +188,62 @@ export default function App() {
   };
 
   const handleToggleSaveRecipe = (recipe: Recipe) => {
-      const isSaved = savedRecipes.some(r => r.id === recipe.id);
-      if (isSaved) {
-          setSavedRecipes(prev => prev.filter(r => r.id !== recipe.id));
-      } else {
-          setSavedRecipes(prev => [...prev, recipe]);
-      }
+    const isSaved = savedRecipes.some(r => r.id === recipe.id);
+    if (isSaved) {
+      setSavedRecipes(prev => prev.filter(r => r.id !== recipe.id));
+    } else {
+      setSavedRecipes(prev => [...prev, recipe]);
+    }
   };
 
   const checkForBadges = (currentCount: number): Badge[] => {
-      const newBadges: Badge[] = [];
-      const currentBadgeIds = new Set(userProfile.badges.map(b => b.id));
+    const newBadges: Badge[] = [];
+    const currentBadgeIds = new Set(userProfile.badges.map(b => b.id));
 
-      if (currentCount >= 1 && !currentBadgeIds.has('novice')) {
-          newBadges.push({ id: 'novice', name: 'Novice Chef', description: 'Cooked your first meal!', icon: '🥚', unlockedAt: Date.now() });
-      }
-      if (currentCount >= 5 && !currentBadgeIds.has('sous')) {
-          newBadges.push({ id: 'sous', name: 'Sous Chef', description: 'Cooked 5 meals.', icon: '🔪', unlockedAt: Date.now() });
-      }
-      if (currentCount >= 10 && !currentBadgeIds.has('master')) {
-          newBadges.push({ id: 'master', name: 'Head Chef', description: 'Cooked 10 meals. You are a pro!', icon: '👨‍🍳', unlockedAt: Date.now() });
-      }
-      return newBadges;
+    if (currentCount >= 1 && !currentBadgeIds.has('novice')) {
+      newBadges.push({ id: 'novice', name: 'Novice Chef', description: 'Cooked your first meal!', icon: '🥚', unlockedAt: Date.now() });
+    }
+    if (currentCount >= 5 && !currentBadgeIds.has('sous')) {
+      newBadges.push({ id: 'sous', name: 'Sous Chef', description: 'Cooked 5 meals.', icon: '🔪', unlockedAt: Date.now() });
+    }
+    if (currentCount >= 10 && !currentBadgeIds.has('master')) {
+      newBadges.push({ id: 'master', name: 'Head Chef', description: 'Cooked 10 meals. You are a pro!', icon: '👨‍🍳', unlockedAt: Date.now() });
+    }
+    return newBadges;
   };
 
   const handleFinishCooking = () => {
-      setIsCooking(false);
-      // Increment stats
-      const newCount = (userProfile.recipesCooked || 0) + 1;
-      const newBadges = checkForBadges(newCount);
-      
-      setUserProfile(prev => ({
-          ...prev,
-          recipesCooked: newCount,
-          badges: [...prev.badges, ...newBadges]
-      }));
+    setIsCooking(false);
+    // Increment stats
+    const newCount = (userProfile.recipesCooked || 0) + 1;
+    const newBadges = checkForBadges(newCount);
 
-      if (newBadges.length > 0) {
-          alert(`Congratulations! You unlocked ${newBadges.length} new badge(s)! Check your profile.`);
-      }
+    setUserProfile(prev => ({
+      ...prev,
+      recipesCooked: newCount,
+      badges: [...prev.badges, ...newBadges]
+    }));
+
+    if (newBadges.length > 0) {
+      alert(`Congratulations! You unlocked ${newBadges.length} new badge(s)! Check your profile.`);
+    }
   };
 
   // Determine if mobile header should be shown
-  // Hide on full screen modes if necessary, or keep it. 
-  // RecipeDetail has its own header, so we can hide the mobile menu button there to avoid clutter
-  // OR we keep it so users can always access menu. Let's keep it for consistency unless cooking.
   const showMobileHeader = !isCooking && !selectedRecipe;
 
   return (
     <div className="flex h-screen w-screen bg-slate-50 overflow-hidden">
       {/* Mobile Overlay */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
-      <Sidebar 
-        activeView={view} 
+      <Sidebar
+        activeView={view}
         onNavigate={handleNavigate}
         activeFilters={activeFilters}
         onToggleFilter={handleToggleFilter}
@@ -244,97 +251,102 @@ export default function App() {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
-      
+
       <main className="flex-1 h-full relative overflow-hidden flex flex-col">
-        
+
         {/* Mobile Header */}
         {showMobileHeader && (
-            <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between flex-shrink-0 z-30">
-                <div className="flex items-center gap-2 text-emerald-700 font-bold">
-                    <ChefHat size={24} />
-                    <span>CulinaryLens</span>
-                </div>
-                <button 
-                    onClick={() => setIsSidebarOpen(true)}
-                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-full"
-                >
-                    <Menu size={24} />
-                </button>
+          <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between flex-shrink-0 z-30">
+            <div className="flex items-center gap-2 text-emerald-700 font-bold">
+              <ChefHat size={24} />
+              <span>CulinaryLens</span>
             </div>
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-2 text-slate-600 hover:bg-slate-100 rounded-full"
+            >
+              <Menu size={24} />
+            </button>
+          </div>
         )}
 
         <div className="flex-1 overflow-hidden relative flex flex-col">
-            {view === 'home' && (
-            <CameraCapture onImageCaptured={handleImageCaptured} onSurpriseMe={handleSurpriseMe} isLoading={isLoading} />
-            )}
+          {view === 'home' && (
+            <CameraCapture
+              onImageCaptured={handleImageCaptured}
+              onSurpriseMe={handleSurpriseMe}
+              isLoading={isLoading}
+              onIngredientsDetected={handleIngredientsDetected}
+            />
+          )}
 
-            {view === 'kitchen-assistant' && (
+          {view === 'kitchen-assistant' && (
             <KitchenAssistant />
-            )}
+          )}
 
-            {view === 'recipes' && !selectedRecipe && (
-            <RecipeList 
-                recipes={recipes} 
-                onSelectRecipe={(r) => setSelectedRecipe(r)} 
+          {view === 'recipes' && !selectedRecipe && (
+            <RecipeList
+              recipes={recipes}
+              onSelectRecipe={(r) => setSelectedRecipe(r)}
             />
-            )}
+          )}
 
-            {view === 'cookbook' && !selectedRecipe && (
-                <Cookbook 
-                    savedRecipes={savedRecipes}
-                    onSelectRecipe={setSelectedRecipe}
-                    onRemoveRecipe={(id) => setSavedRecipes(prev => prev.filter(r => r.id !== id))}
-                />
-            )}
+          {view === 'cookbook' && !selectedRecipe && (
+            <Cookbook
+              savedRecipes={savedRecipes}
+              onSelectRecipe={setSelectedRecipe}
+              onRemoveRecipe={(id) => setSavedRecipes(prev => prev.filter(r => r.id !== id))}
+            />
+          )}
 
-            {(view === 'recipes' || view === 'cookbook') && selectedRecipe && (
-            <RecipeDetail 
-                recipe={selectedRecipe} 
-                onBack={() => setSelectedRecipe(null)}
-                onStartCooking={() => setIsCooking(true)}
-                onAddToShoppingList={handleAddToShoppingList}
-                shoppingList={shoppingList}
-                isSaved={savedRecipes.some(r => r.id === selectedRecipe.id)}
-                onToggleSave={handleToggleSaveRecipe}
+          {(view === 'recipes' || view === 'cookbook') && selectedRecipe && (
+            <RecipeDetail
+              recipe={selectedRecipe}
+              onBack={() => setSelectedRecipe(null)}
+              onStartCooking={() => setIsCooking(true)}
+              onAddToShoppingList={handleAddToShoppingList}
+              shoppingList={shoppingList}
+              isSaved={savedRecipes.some(r => r.id === selectedRecipe.id)}
+              onToggleSave={handleToggleSaveRecipe}
             />
-            )}
+          )}
 
-            {view === 'pantry' && (
-            <Pantry 
-                pantryItems={pantry}
-                onAddPantryItem={handleAddPantryItem}
-                onRemovePantryItem={handleRemovePantryItem}
+          {view === 'pantry' && (
+            <Pantry
+              pantryItems={pantry}
+              onAddPantryItem={handleAddPantryItem}
+              onRemovePantryItem={handleRemovePantryItem}
             />
-            )}
+          )}
 
-            {view === 'profile' && (
-            <Profile 
-                profile={userProfile}
-                onUpdateProfile={setUserProfile}
+          {view === 'profile' && (
+            <Profile
+              profile={userProfile}
+              onUpdateProfile={setUserProfile}
             />
-            )}
+          )}
 
-            {view === 'meal-planner' && (
-            <MealPlanner 
-                pantryItems={pantry}
-                userProfile={userProfile}
+          {view === 'meal-planner' && (
+            <MealPlanner
+              pantryItems={pantry}
+              userProfile={userProfile}
             />
-            )}
-            
-            {view === 'shopping' && (
-            <ShoppingList 
-                items={shoppingList}
-                onAddItem={handleAddToShoppingList}
-                onRemoveItem={handleRemoveFromShoppingList}
+          )}
+
+          {view === 'shopping' && (
+            <ShoppingList
+              items={shoppingList}
+              onAddItem={handleAddToShoppingList}
+              onRemoveItem={handleRemoveFromShoppingList}
             />
-            )}
+          )}
         </div>
 
         {/* Full Screen Cooking Mode Overlay */}
         {isCooking && selectedRecipe && (
-          <CookingMode 
-            recipe={selectedRecipe} 
-            onClose={handleFinishCooking} 
+          <CookingMode
+            recipe={selectedRecipe}
+            onClose={handleFinishCooking}
           />
         )}
       </main>
