@@ -4,38 +4,71 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CulinaryLens</title>
+
+  <!-- SEO Meta Tags -->
+  <title>JiselCook - AI-Powered Recipe Assistant</title>
+  <meta name="description"
+    content="Transform your fridge into gourmet meals with AI. Scan ingredients, get personalized recipes, and cook with live AI chef guidance." />
+  <meta name="keywords" content="AI recipes, cooking assistant, meal planning, ingredient scanner, smart cooking" />
+  <meta name="author" content="JiselCook" />
+
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="JiselCook - AI-Powered Recipe Assistant" />
+  <meta property="og:description"
+    content="Transform your fridge into gourmet meals with AI-powered recipe generation and live chef assistance." />
+  <meta property="og:image" content="/og-image.png" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+
+  <!-- Tailwind CSS CDN (for development) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Custom Styles -->
   <style>
     body {
       font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     /* Custom scrollbar for cleaner look */
     ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
+      width: 8px;
+      height: 8px;
     }
 
     ::-webkit-scrollbar-track {
       background: transparent;
-      border-radius: 3px;
+      border-radius: 4px;
     }
 
     ::-webkit-scrollbar-thumb {
       background: #CBD5E1;
-      border-radius: 3px;
+      border-radius: 4px;
+      transition: background 0.2s;
     }
 
     ::-webkit-scrollbar-thumb:hover {
       background: #94A3B8;
     }
+
+    /* Smooth animations */
+    * {
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
   </style>
   <link rel="stylesheet" href="/index.css">
 </head>
 
-<body class="bg-slate-50 text-slate-900">
+<body class="bg-slate-50 text-slate-900 overflow-hidden">
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
