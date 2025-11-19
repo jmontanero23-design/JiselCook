@@ -118,7 +118,7 @@ export async function analyzeFridgeAndSuggestRecipes(
     `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-2.0-flash-exp',
             contents: {
                 parts: [
                     {
@@ -181,7 +181,7 @@ export async function generateSurpriseRecipe(userProfile: UserProfile, filters: 
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-2.0-flash-exp',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -207,10 +207,43 @@ export async function generateSurpriseRecipe(userProfile: UserProfile, filters: 
 
 export async function generateRecipeImage(recipeTitle: string, recipeDescription: string): Promise<string | null> {
     try {
-        // Image generation is not available in the current @google/genai SDK
-        // Returning null - you can integrate with alternative image generation APIs
-        // such as DALL-E, Stable Diffusion, or wait for Imagen API support
-        console.warn("Image generation not available in current SDK version");
+        const apiKey = import.meta.env.VITE_API_KEY;
+        if (!apiKey) {
+            console.warn("No API key found for image generation");
+            return null;
+        }
+
+        // Try to use Imagen 3 via REST API
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                instances: [{
+                    prompt: `Professional food photography of ${recipeTitle}. ${recipeDescription}. High resolution, delicious, appetizing, 4k, studio lighting.`
+                }],
+                parameters: {
+                    sampleCount: 1,
+                    aspectRatio: "4:3"
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(`Imagen API failed: ${response.status} ${response.statusText}`, errorText);
+            // Fallback to null so the UI can handle it or use a placeholder
+            return null;
+        }
+
+        const data = await response.json();
+        if (data.predictions && data.predictions.length > 0) {
+            // The API returns base64 encoded image bytes
+            const base64Image = data.predictions[0].bytesBase64Encoded;
+            return `data:image/png;base64,${base64Image}`;
+        }
+
         return null;
     } catch (error) {
         console.error("Error generating image:", error);
@@ -232,7 +265,7 @@ export async function remixRecipe(originalRecipe: Recipe, modification: string):
     `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-2.0-flash-exp',
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -289,7 +322,7 @@ export async function generateMealPlan(ingredients: string[], userProfile: UserP
     };
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-2.0-flash-exp',
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -303,7 +336,7 @@ export async function generateMealPlan(ingredients: string[], userProfile: UserP
 export async function findCookingResources(recipeTitle: string): Promise<SearchResult[]> {
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash-exp",
             contents: `Find top-rated video tutorials, blog posts, or cooking guides for the recipe: "${recipeTitle}". Focus on reputable food sources.`,
             config: {
                 tools: [{ googleSearch: {} }],
@@ -350,7 +383,7 @@ export async function getNutritionalInsights(recipe: Recipe): Promise<string> {
     `;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: 'gemini-2.0-flash-exp',
         contents: prompt,
     });
 
@@ -378,7 +411,7 @@ export async function organizeShoppingList(items: string[]): Promise<ShoppingCat
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
+            model: 'gemini-2.0-flash-exp',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -427,7 +460,7 @@ export async function processShoppingVoiceCommand(base64Audio: string, mimeType:
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.0-flash-exp',
             contents: {
                 parts: [
                     {
@@ -462,7 +495,7 @@ export async function identifyIngredientsFromImage(base64Image: string): Promise
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.0-flash-exp',
             contents: {
                 parts: [
                     { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },

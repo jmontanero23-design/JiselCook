@@ -1,6 +1,6 @@
 // Gemini Live API Service - Proper SDK Implementation
 // Using @google/genai v1.30.0 with native Live API support
-// November 2025 - Using gemini-2.5-flash model for best audio quality and natural conversations
+// November 2025 - Using gemini-2.0-flash-exp model for best audio quality and natural conversations
 
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 
@@ -35,23 +35,22 @@ export class GeminiLiveSession {
             await this.audioContext.resume();
 
             // Connect to Live API using SDK's built-in method
-            // Using the experimental model that actually supports Live API
             this.session = await this.ai.live.connect({
                 model: 'gemini-2.0-flash-exp',
                 callbacks: {
                     onopen: () => {
                         console.log('✅ Live API Session Opened');
                         this.config.onOpen?.();
+                        // Send a hello message to start the conversation
+                        this.sendText("Hello! I'm ready to cook.");
                     },
                     onmessage: async (msg: LiveServerMessage) => {
-                        console.log('📨 Received message from Live API:', msg);
+                        // console.log('📨 Received message from Live API:', msg);
                         // Handle audio response
                         const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
                         if (audioData) {
-                            console.log('🔊 Playing audio response');
+                            // console.log('🔊 Playing audio response');
                             await this.playAudio(audioData);
-                        } else {
-                            console.log('⚠️ No audio data in response');
                         }
                         this.config.onMessage?.(msg);
                     },
@@ -116,24 +115,16 @@ export class GeminiLiveSession {
         }
 
         const base64Data = this.base64EncodeAudio(audioData);
-        console.log('📤 Sending audio chunk, size:', audioData.length);
 
         try {
             // Use the correct method name for the SDK
-            if (this.session.send) {
+            if (typeof this.session.send === 'function') {
                 this.session.send({
                     realtimeInput: {
                         mediaChunks: [{
                             mimeType: 'audio/pcm;rate=24000',
                             data: base64Data
                         }]
-                    }
-                });
-            } else if (this.session.sendRealtimeInput) {
-                this.session.sendRealtimeInput({
-                    media: {
-                        mimeType: 'audio/pcm;rate=24000',
-                        data: base64Data
                     }
                 });
             } else {
@@ -144,6 +135,25 @@ export class GeminiLiveSession {
         }
     }
 
+    sendText(text: string) {
+        if (!this.session) return;
+        try {
+            if (typeof this.session.send === 'function') {
+                this.session.send({
+                    clientContent: {
+                        turns: [{
+                            role: 'user',
+                            parts: [{ text }]
+                        }],
+                        turnComplete: true
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error sending text:', error);
+        }
+    }
+
     sendImage(base64Image: string) {
         if (!this.session) {
             console.warn('Session not ready');
@@ -151,12 +161,16 @@ export class GeminiLiveSession {
         }
 
         try {
-            this.session.sendRealtimeInput({
-                media: {
-                    mimeType: 'image/jpeg',
-                    data: base64Image
-                }
-            });
+            if (typeof this.session.send === 'function') {
+                this.session.send({
+                    realtimeInput: {
+                        mediaChunks: [{
+                            mimeType: 'image/jpeg',
+                            data: base64Image
+                        }]
+                    }
+                });
+            }
         } catch (error) {
             console.error('Error sending image:', error);
         }

@@ -1,23 +1,22 @@
 // Image generation service with smart food image selection
 // Uses Unsplash for high-quality, relevant food photos
 
+import { generateRecipeImage as generateAIImageInternal } from './geminiService';
+
 export async function generateRecipeImage(recipeTitle: string, recipeDescription: string): Promise<string | null> {
     try {
-        // Extract key food terms from the recipe title and description
-        const foodTerms = extractFoodTerms(recipeTitle, recipeDescription);
+        // Try AI generation first
+        const aiImage = await generateAIImageInternal(recipeTitle, recipeDescription);
+        if (aiImage) return aiImage;
 
-        // Use Unsplash Source API for high-quality food images (no API key required)
-        // This provides much better results than generic placeholders
-        const query = encodeURIComponent(foodTerms.join(','));
-
-        // Returns a relevant, high-quality food image
-        // The 1.5 crop ratio works well for recipe cards
-        return `https://source.unsplash.com/800x600/?${query},food,dish,cuisine`;
+        // Fallback to a reliable placeholder service
+        // Unsplash Source is deprecated/unreliable
+        const encodedTitle = encodeURIComponent(recipeTitle);
+        return `https://placehold.co/800x600/e2e8f0/1e293b?text=${encodedTitle}`;
 
     } catch (error) {
         console.error("Error generating recipe image:", error);
-        // Fallback to a generic food image
-        return `https://source.unsplash.com/800x600/?food,meal,cooking`;
+        return `https://placehold.co/800x600/e2e8f0/1e293b?text=Delicious+Food`;
     }
 }
 
