@@ -17,6 +17,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [isContinuousMode, setIsContinuousMode] = useState(false);
   const [liveLabel, setLiveLabel] = useState<string | null>(null);
+  const [detectedIngredients, setDetectedIngredients] = useState<Set<string>>(new Set());
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<number | null>(null);
 
@@ -110,9 +111,24 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
             const ingredients = await identifyIngredientsFromImage(base64Data);
             if (ingredients.length > 0) {
               setLiveLabel(`Found: ${ingredients.join(', ')}`);
-              if (onIngredientsDetected) {
-                onIngredientsDetected(ingredients);
-              }
+
+              // Update local state and notify parent
+              setDetectedIngredients(prev => {
+                const newSet = new Set(prev);
+                let hasNew = false;
+                ingredients.forEach(ing => {
+                  if (!newSet.has(ing)) {
+                    newSet.add(ing);
+                    hasNew = true;
+                  }
+                });
+
+                if (hasNew && onIngredientsDetected) {
+                  onIngredientsDetected(Array.from(newSet));
+                }
+                return newSet;
+              });
+
             } else {
               setLiveLabel("Scanning...");
             }
@@ -121,7 +137,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
           }
         }
       }
-    }, 3000); // Scan every 3 seconds
+    }, 2000); // Scan every 2 seconds for faster feedback
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,8 +243,26 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
               </button>
             </div>
             <div className="absolute top-4 left-4 right-4 pointer-events-none">
-              <div className="border-2 border-white/30 rounded-xl h-48 w-full flex items-center justify-center relative">
+              <div className="border-2 border-white/30 rounded-xl h-48 w-full flex items-center justify-center relative overflow-hidden">
+                {isContinuousMode && (
+                  <div className="absolute top-0 left-0 w-full h-1 bg-emerald-400/80 shadow-[0_0_15px_rgba(52,211,153,0.8)] animate-[scan_2s_linear_infinite]" />
+                )}
                 <p className="text-white/70 text-sm font-bold bg-black/20 px-2 rounded">Align ingredients here</p>
+
+                {/* Detected Ingredients List Overlay */}
+                {detectedIngredients.size > 0 && (
+                  <div className="absolute top-2 right-2 flex flex-col items-end gap-1 max-h-40 overflow-y-auto">
+                    {Array.from(detectedIngredients).slice(-5).map((ing, idx) => (
+                      <span key={idx} className="bg-black/60 backdrop-blur-md text-white text-xs px-2 py-1 rounded-md animate-in slide-in-from-right-2">
+                        + {ing}
+                      </span>
+                    ))}
+                    {detectedIngredients.size > 5 && (
+                      <span className="text-white/80 text-xs">...and {detectedIngredients.size - 5} more</span>
+                    )}
+                  </div>
+                )}
+
                 {liveLabel && (
                   <div className="absolute -bottom-12 bg-black/60 backdrop-blur-md text-white px-4 py-2 rounded-lg animate-in fade-in slide-in-from-bottom-4">
                     <p className="text-sm font-medium">{liveLabel}</p>

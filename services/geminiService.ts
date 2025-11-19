@@ -69,6 +69,17 @@ const recipeSchema: Schema = {
     }
 };
 
+function cleanJson(text: string): string {
+    if (!text) return "[]";
+    let cleaned = text.trim();
+    if (cleaned.startsWith("```json")) {
+        cleaned = cleaned.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+    } else if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```\s*/, "").replace(/\s*```$/, "");
+    }
+    return cleaned;
+}
+
 export async function analyzeFridgeAndSuggestRecipes(
     base64Image: string,
     mimeType: string,
@@ -131,7 +142,8 @@ export async function analyzeFridgeAndSuggestRecipes(
         const jsonText = response.text;
         if (!jsonText) return [];
 
-        const recipesRaw = JSON.parse(jsonText) as Omit<Recipe, 'id'>[];
+        const cleanedJson = cleanJson(jsonText);
+        const recipesRaw = JSON.parse(cleanedJson) as Omit<Recipe, 'id'>[];
 
         // Add client-side IDs
         return recipesRaw.map((r, index) => ({
@@ -181,7 +193,8 @@ export async function generateSurpriseRecipe(userProfile: UserProfile, filters: 
         const jsonText = response.text;
         if (!jsonText) return [];
 
-        const recipesRaw = JSON.parse(jsonText) as Omit<Recipe, 'id'>[];
+        const cleanedJson = cleanJson(jsonText);
+        const recipesRaw = JSON.parse(cleanedJson) as Omit<Recipe, 'id'>[];
         return recipesRaw.map((r, index) => ({
             ...r,
             id: `surprise-${Date.now()}-${index}`
@@ -241,7 +254,8 @@ export async function remixRecipe(originalRecipe: Recipe, modification: string):
     const jsonText = response.text;
     if (!jsonText) throw new Error("No data returned");
 
-    const recipes = JSON.parse(jsonText) as Omit<Recipe, 'id'>[];
+    const cleanedJson = cleanJson(jsonText);
+    const recipes = JSON.parse(cleanedJson) as Omit<Recipe, 'id'>[];
     if (recipes.length === 0) throw new Error("Failed to modify recipe");
 
     return {
@@ -294,7 +308,7 @@ export async function generateMealPlan(ingredients: string[], userProfile: UserP
         }
     });
 
-    return JSON.parse(response.text || '[]');
+    return JSON.parse(cleanJson(response.text || '[]'));
 }
 
 export async function findCookingResources(recipeTitle: string): Promise<SearchResult[]> {
@@ -383,7 +397,7 @@ export async function organizeShoppingList(items: string[]): Promise<ShoppingCat
             }
         });
 
-        return JSON.parse(response.text || '[]');
+        return JSON.parse(cleanJson(response.text || '[]'));
     } catch (error) {
         console.error("Error organizing shopping list:", error);
         // Fallback to single 'Uncategorized' list if AI fails
@@ -442,7 +456,7 @@ export async function processShoppingVoiceCommand(base64Audio: string, mimeType:
             }
         });
 
-        const result = JSON.parse(response.text || '{}');
+        const result = JSON.parse(cleanJson(response.text || '{}'));
         return result.commands || [];
     } catch (error) {
         console.error("Error processing voice command:", error);
@@ -475,7 +489,7 @@ export async function identifyIngredientsFromImage(base64Image: string): Promise
             }
         });
 
-        return JSON.parse(response.text || '[]');
+        return JSON.parse(cleanJson(response.text || '[]'));
     } catch (e) {
         console.error("Error identifying ingredients:", e);
         return [];
