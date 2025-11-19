@@ -208,7 +208,7 @@ export async function generateSurpriseRecipe(userProfile: UserProfile, filters: 
 export async function generateRecipeImage(recipeTitle: string, recipeDescription: string): Promise<string | null> {
     try {
         const response = await ai.models.generateImages({
-            model: 'imagen-3.0-generate-001',
+            model: 'imagen-3.0-fast-generate-001',
             prompt: `A professional, high-quality food photography shot of ${recipeTitle}. ${recipeDescription}. The lighting should be natural and appetizing, plated beautifully on a table.`,
             config: {
                 numberOfImages: 1,

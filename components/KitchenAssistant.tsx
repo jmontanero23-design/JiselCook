@@ -89,7 +89,15 @@ export const KitchenAssistant: React.FC = () => {
     const startLiveSession = async (personaOverride?: ChefPersonality) => {
         setIsLiveLoading(true);
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            // Validate API key
+            const apiKey = process.env.API_KEY;
+            if (!apiKey) {
+                alert("API key not configured. Please set up your Gemini API key in the .env file.");
+                setIsLiveLoading(false);
+                return;
+            }
+
+            const ai = new GoogleGenAI({ apiKey });
             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
             await audioContext.resume();
             audioContextRef.current = audioContext;
@@ -126,7 +134,7 @@ export const KitchenAssistant: React.FC = () => {
                             const base64Data = base64EncodeAudio(inputData);
                             sessionPromise.then(session => {
                                 session.sendRealtimeInput({
-                                    media: { mimeType: 'audio/pcm;rate=16000', data: base64Data }
+                                    media: { mimeType: 'audio/pcm;rate=24000', data: base64Data }
                                 });
                             });
                         };
@@ -144,7 +152,13 @@ export const KitchenAssistant: React.FC = () => {
                             const bytes = new Uint8Array(len);
                             for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
 
-                            const float32Data = new Float32Array(bytes.buffer);
+                            // Convert 16-bit PCM to Float32
+                            const int16Array = new Int16Array(bytes.buffer);
+                            const float32Data = new Float32Array(int16Array.length);
+                            for (let i = 0; i < int16Array.length; i++) {
+                                float32Data[i] = int16Array[i] / 32768;  // Convert to -1 to 1 range
+                            }
+
                             const audioBuffer = audioContext.createBuffer(1, float32Data.length, 24000);
                             audioBuffer.getChannelData(0).set(float32Data);
 
@@ -260,12 +274,34 @@ export const KitchenAssistant: React.FC = () => {
         }
     };
 
-    const stopLiveSession = () => {
-        if (processorRef.current) { processorRef.current.disconnect(); processorRef.current = null; }
-        if (inputSourceRef.current) { inputSourceRef.current.disconnect(); inputSourceRef.current = null; }
-        if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null; }
+    const stopLiveSession = async () => {
+        // Disconnect audio processing
+        if (processorRef.current) {
+            processorRef.current.disconnect();
+            processorRef.current = null;
+        }
+        if (inputSourceRef.current) {
+            inputSourceRef.current.disconnect();
+            inputSourceRef.current = null;
+        }
+
+        // Properly close audio context (async)
+        if (audioContextRef.current) {
+            try {
+                await audioContextRef.current.close();
+            } catch (e) {
+                console.error("Error closing audio context:", e);
+            }
+            audioContextRef.current = null;
+        }
+
+        // Stop video processing
         stopVideoLoop();
-        if (videoStreamRef.current) videoStreamRef.current.getTracks().forEach(track => track.stop());
+        if (videoStreamRef.current) {
+            videoStreamRef.current.getTracks().forEach(track => track.stop());
+            videoStreamRef.current = null;
+        }
+
         setIsLiveConnected(false);
     };
 
