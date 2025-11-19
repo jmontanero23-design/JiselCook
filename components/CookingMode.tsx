@@ -138,7 +138,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
 
             // Connect to Gemini Live
             const sessionPromise = ai.live.connect({
-                model: 'gemini-2.0-flash-exp',
+                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 callbacks: {
                     onopen: () => {
                         console.log("Live Session Opened");
@@ -513,8 +513,8 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
                     <button
                         onClick={toggleLive}
                         className={`flex items-center space-x-2 px-4 py-2 rounded-full font-medium transition-all ${isLiveConnected
-                                ? 'bg-red-100 text-red-700 animate-pulse ring-2 ring-red-400'
-                                : isLiveLoading ? 'bg-slate-100 text-slate-400' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-red-100 text-red-700 animate-pulse ring-2 ring-red-400'
+                            : isLiveLoading ? 'bg-slate-100 text-slate-400' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                     >
                         {isLiveLoading ? <Loader2 className="animate-spin" size={20} /> : isLiveConnected ? <Mic size={20} /> : <MicOff size={20} />}
