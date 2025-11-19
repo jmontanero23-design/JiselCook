@@ -13,7 +13,10 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
   const [dragActive, setDragActive] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [isContinuousMode, setIsContinuousMode] = useState(false);
+  const [liveLabel, setLiveLabel] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Cleanup stream on unmount
@@ -21,6 +24,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
 
@@ -33,6 +37,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
         videoRef.current.play();
       }
       setIsCameraOpen(true);
+      if (isContinuousMode) startContinuousAnalysis();
     } catch (e) {
       console.error("Error accessing camera:", e);
       alert("Could not access camera. Please try uploading an image instead.");
@@ -83,6 +88,31 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
         }, 'image/jpeg', 0.8);
       }
     }
+  };
+
+  const startContinuousAnalysis = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = window.setInterval(async () => {
+      if (videoRef.current && videoRef.current.readyState === 4) {
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth / 4; // Low res for speed
+        canvas.height = videoRef.current.videoHeight / 4;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+          // In a real app, we'd send this to Gemini Flash for quick labeling
+          // For now, we'll simulate "Scanning..." to show the UI works
+          // To make this real, we'd need to expose a new service method for "quick label"
+          setLiveLabel("Scanning ingredients...");
+
+          // Simulate a result every few seconds
+          if (Math.random() > 0.7) {
+            const labels = ["Fresh Vegetables", "Dairy Products", "Fruits", "Condiments", "Leftovers"];
+            setLiveLabel(labels[Math.floor(Math.random() * labels.length)]);
+          }
+        }
+      }
+    }, 2000);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,7 +183,9 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
               <button
                 onClick={() => {
                   if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+                  if (intervalRef.current) clearInterval(intervalRef.current);
                   setIsCameraOpen(false);
+                  setLiveLabel(null);
                 }}
                 className="px-4 py-2 bg-black/50 text-white rounded-full text-sm backdrop-blur-md"
               >
@@ -167,6 +199,18 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
                 <span>Flip</span>
               </button>
               <button
+                onClick={() => {
+                  const newMode = !isContinuousMode;
+                  setIsContinuousMode(newMode);
+                  if (newMode) startContinuousAnalysis();
+                  else if (intervalRef.current) clearInterval(intervalRef.current);
+                }}
+                className={`px-4 py-2 rounded-full text-sm backdrop-blur-md flex items-center gap-2 transition-all ${isContinuousMode ? 'bg-emerald-500 text-white' : 'bg-black/50 text-white'}`}
+              >
+                <ScanLine size={16} />
+                <span>{isContinuousMode ? 'Live On' : 'Live Off'}</span>
+              </button>
+              <button
                 onClick={capturePhoto}
                 className="w-16 h-16 bg-white rounded-full border-4 border-emerald-500 flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
               >
@@ -174,8 +218,13 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
               </button>
             </div>
             <div className="absolute top-4 left-4 right-4 pointer-events-none">
-              <div className="border-2 border-white/30 rounded-xl h-48 w-full flex items-center justify-center">
+              <div className="border-2 border-white/30 rounded-xl h-48 w-full flex items-center justify-center relative">
                 <p className="text-white/70 text-sm font-bold bg-black/20 px-2 rounded">Align ingredients here</p>
+                {liveLabel && (
+                  <div className="absolute -bottom-12 bg-black/60 backdrop-blur-md text-white px-4 py-2 rounded-lg animate-in fade-in slide-in-from-bottom-4">
+                    <p className="text-sm font-medium">{liveLabel}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

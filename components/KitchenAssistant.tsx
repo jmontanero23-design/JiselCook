@@ -34,6 +34,7 @@ export const KitchenAssistant: React.FC = () => {
     const [personality, setPersonality] = useState<ChefPersonality>('Professional');
     const [showPersonaSelector, setShowPersonaSelector] = useState(false);
     const [transcript, setTranscript] = useState<string>("");
+    const [volume, setVolume] = useState(0);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -90,6 +91,7 @@ export const KitchenAssistant: React.FC = () => {
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+            await audioContext.resume();
             audioContextRef.current = audioContext;
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -112,6 +114,15 @@ export const KitchenAssistant: React.FC = () => {
 
                         processor.onaudioprocess = (e) => {
                             const inputData = e.inputBuffer.getChannelData(0);
+
+                            // Calculate volume for visual feedback
+                            let sum = 0;
+                            for (let i = 0; i < inputData.length; i++) {
+                                sum += inputData[i] * inputData[i];
+                            }
+                            const rms = Math.sqrt(sum / inputData.length);
+                            setVolume(Math.min(100, rms * 500)); // Scale up for visibility
+
                             const base64Data = base64EncodeAudio(inputData);
                             sessionPromise.then(session => {
                                 session.sendRealtimeInput({
@@ -340,10 +351,20 @@ export const KitchenAssistant: React.FC = () => {
                     {isLiveConnected && (
                         <div className="animate-in fade-in zoom-in duration-300 flex flex-col items-center">
                             <div className="w-32 h-32 rounded-full bg-gradient-to-br from-emerald-500/20 to-blue-500/20 flex items-center justify-center backdrop-blur-md border border-white/10 mb-6 relative">
-                                <div className="absolute inset-0 rounded-full border-2 border-emerald-500/30 animate-ping" />
+                                <div
+                                    className="absolute inset-0 rounded-full border-2 border-emerald-500/30 transition-all duration-75"
+                                    style={{ transform: `scale(${1 + volume / 50})`, opacity: 0.5 + volume / 200 }}
+                                />
                                 {getPersonaIcon(personality, 64)}
                             </div>
                             <p className="text-2xl font-light text-white/80">"I'm listening..."</p>
+                            {/* Volume Meter Bar */}
+                            <div className="w-48 h-1 bg-white/10 rounded-full mt-4 overflow-hidden">
+                                <div
+                                    className="h-full bg-emerald-500 transition-all duration-75"
+                                    style={{ width: `${volume}%` }}
+                                />
+                            </div>
                             <p className="text-sm text-emerald-400 mt-2 font-medium uppercase tracking-wide border border-emerald-500/30 px-3 py-1 rounded-full bg-emerald-500/10">
                                 {personality} Mode Active
                             </p>
