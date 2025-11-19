@@ -90,7 +90,7 @@ export const KitchenAssistant: React.FC = () => {
         setIsLiveLoading(true);
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
             await audioContext.resume();
             audioContextRef.current = audioContext;
 
@@ -100,7 +100,7 @@ export const KitchenAssistant: React.FC = () => {
             const personaConfig = getPersonalityConfig(currentPersona);
 
             const sessionPromise = ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                model: 'gemini-2.0-flash-exp',
                 callbacks: {
                     onopen: () => {
                         setIsLiveConnected(true);

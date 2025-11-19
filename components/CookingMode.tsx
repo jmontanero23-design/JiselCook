@@ -127,7 +127,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
             // Setup Audio Contexts
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
             audioContextRef.current = audioContext;
 
             // Get Mic Stream
@@ -138,7 +138,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
 
             // Connect to Gemini Live
             const sessionPromise = ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                model: 'gemini-2.0-flash-exp',
                 callbacks: {
                     onopen: () => {
                         console.log("Live Session Opened");
