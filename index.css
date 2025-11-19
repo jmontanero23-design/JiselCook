@@ -66,9 +66,7 @@
     }
   }
 
-  /* S
-
-lide up animation */
+  /* Slide up animation */
   @keyframes slide-up {
     from {
       transform: translateY(20px);
