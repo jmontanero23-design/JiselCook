@@ -35,9 +35,9 @@ export class GeminiLiveSession {
             await this.audioContext.resume();
 
             // Connect to Live API using SDK's built-in method
-            // Using the latest Gemini 2.5 Flash model for best audio quality
+            // Using the experimental model that actually supports Live API
             this.session = await this.ai.live.connect({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-2.0-flash-exp',
                 callbacks: {
                     onopen: () => {
                         console.log('✅ Live API Session Opened');
@@ -119,12 +119,26 @@ export class GeminiLiveSession {
         console.log('📤 Sending audio chunk, size:', audioData.length);
 
         try {
-            this.session.sendRealtimeInput({
-                media: {
-                    mimeType: 'audio/pcm;rate=24000', // SDK expects 24kHz
-                    data: base64Data
-                }
-            });
+            // Use the correct method name for the SDK
+            if (this.session.send) {
+                this.session.send({
+                    realtimeInput: {
+                        mediaChunks: [{
+                            mimeType: 'audio/pcm;rate=24000',
+                            data: base64Data
+                        }]
+                    }
+                });
+            } else if (this.session.sendRealtimeInput) {
+                this.session.sendRealtimeInput({
+                    media: {
+                        mimeType: 'audio/pcm;rate=24000',
+                        data: base64Data
+                    }
+                });
+            } else {
+                console.error('❌ No valid send method found on session');
+            }
         } catch (error) {
             console.error('❌ Error sending audio:', error);
         }
