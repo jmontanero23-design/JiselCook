@@ -415,23 +415,20 @@ export async function organizeShoppingList(items: string[]): Promise<ShoppingLis
     }
 }
 
-export async function processShoppingVoiceCommand(audioBlob: Blob): Promise<string[]> {
+export async function processShoppingVoiceCommand(base64Audio: string, mimeType: string): Promise<{ action: 'add' | 'remove', item: string }[]> {
     if (!apiKey) return [];
 
     try {
-        // Use Gemini 2.5 Flash for fast audio processing
-        const base64Audio = await blobToBase64(audioBlob);
-
         const response = await genAI.models.generateContent({
             model: MODEL_FAST,
             contents: [
                 {
                     role: "user",
                     parts: [
-                        { text: "Extract shopping list items from this audio. Return just a JSON array of strings." },
+                        { text: "Extract shopping list commands from this audio. Return a JSON array of objects with 'action' ('add' or 'remove') and 'item' (the ingredient name)." },
                         {
                             inlineData: {
-                                mimeType: "audio/wav", // Assuming wav, adjust if needed
+                                mimeType: mimeType,
                                 data: base64Audio
                             }
                         }

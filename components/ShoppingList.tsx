@@ -13,7 +13,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
     const [newItemName, setNewItemName] = useState("");
     const [isOrganizing, setIsOrganizing] = useState(false);
     const [organizedList, setOrganizedList] = useState<ShoppingCategory[] | null>(null);
-    
+
     // Voice Command State
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessingVoice, setIsProcessingVoice] = useState(false);
@@ -33,7 +33,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
         setIsOrganizing(true);
         try {
             const organized = await organizeShoppingList(items);
-            setOrganizedList(organized);
+            if (organized) {
+                setOrganizedList(organized.categories);
+            }
         } catch (e) {
             console.error(e);
             alert("Could not organize list.");
@@ -82,9 +84,9 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
                 const base64Audio = (reader.result as string).split(',')[1];
                 // Determine mimetype based on browser output, usually webm for MediaRecorder
                 const mimeType = audioBlob.type || 'audio/webm';
-                
+
                 const commands = await processShoppingVoiceCommand(base64Audio, mimeType);
-                
+
                 commands.forEach(cmd => {
                     if (cmd.action === 'add') {
                         onAddItem(cmd.item);
@@ -96,7 +98,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
                         }
                     }
                 });
-                
+
                 // Reset organized list if changes occurred
                 if (commands.length > 0) {
                     setOrganizedList(null);
@@ -119,20 +121,19 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
                     Shopping List
                 </h2>
                 <div className="flex gap-3">
-                     {items.length > 0 && (
-                        <button 
+                    {items.length > 0 && (
+                        <button
                             onClick={handleOrganize}
                             disabled={isOrganizing}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all ${
-                                organizedList 
-                                ? 'bg-indigo-100 text-indigo-700 cursor-default' 
-                                : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
-                            }`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all ${organizedList
+                                    ? 'bg-indigo-100 text-indigo-700 cursor-default'
+                                    : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg'
+                                }`}
                         >
                             {isOrganizing ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
                             <span>{organizedList ? 'Organized by AI' : 'Smart Organize'}</span>
                         </button>
-                     )}
+                    )}
                     <span className="bg-emerald-100 text-emerald-800 text-sm font-bold px-3 py-2 rounded-xl">
                         {items.length} items
                     </span>
@@ -141,8 +142,8 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
 
             <div className="flex gap-2 mb-6">
                 <form onSubmit={handleManualAddItem} className="flex-1 flex gap-2">
-                    <input 
-                        type="text" 
+                    <input
+                        type="text"
                         value={newItemName}
                         onChange={(e) => setNewItemName(e.target.value)}
                         placeholder="Add item manually..."
@@ -156,13 +157,12 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
                 <button
                     onClick={isRecording ? stopRecording : startRecording}
                     disabled={isProcessingVoice}
-                    className={`px-4 rounded-xl transition-all flex items-center justify-center ${
-                        isRecording 
-                            ? 'bg-red-500 text-white animate-pulse shadow-red-200 shadow-lg' 
-                            : isProcessingVoice 
+                    className={`px-4 rounded-xl transition-all flex items-center justify-center ${isRecording
+                            ? 'bg-red-500 text-white animate-pulse shadow-red-200 shadow-lg'
+                            : isProcessingVoice
                                 ? 'bg-slate-100 text-slate-400'
                                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-emerald-600 shadow-sm'
-                    }`}
+                        }`}
                     title="Voice Commands: 'Add milk', 'Remove eggs'"
                 >
                     {isProcessingVoice ? (
@@ -174,7 +174,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
                     )}
                 </button>
             </div>
-            
+
             {/* Voice Interaction Hint */}
             <div className="mb-6 px-2">
                 <p className="text-xs text-slate-400 flex items-center gap-1">
@@ -204,10 +204,10 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
                                             return (
                                                 <li key={itemIdx} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
                                                     <span className="font-medium text-slate-700">{item}</span>
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
                                                             if (originalIndex !== -1) onRemoveItem(originalIndex);
-                                                            setOrganizedList(null); 
+                                                            setOrganizedList(null);
                                                         }}
                                                         className="text-slate-300 hover:text-red-500 transition-colors p-2"
                                                     >
@@ -219,7 +219,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
                                     </ul>
                                 </div>
                             ))}
-                             <button 
+                            <button
                                 onClick={() => setOrganizedList(null)}
                                 className="w-full py-3 text-slate-400 hover:text-slate-600 text-sm font-medium"
                             >
@@ -231,7 +231,7 @@ export const ShoppingList: React.FC<ShoppingListProps> = ({ items, onAddItem, on
                             {items.map((item, idx) => (
                                 <li key={idx} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
                                     <span className="font-medium text-slate-700">{item}</span>
-                                    <button 
+                                    <button
                                         onClick={() => onRemoveItem(idx)}
                                         className="text-slate-300 hover:text-red-500 transition-colors p-2"
                                     >
