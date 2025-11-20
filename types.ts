@@ -1,12 +1,16 @@
 export interface Ingredient {
   name: string;
   amount?: string;
+  quantity?: string;
+  unit?: string;
+  category?: string;
   isMissing?: boolean;
 }
 
 export interface Step {
   stepNumber: number;
   instruction: string;
+  duration?: number;
 }
 
 export interface DrinkPairing {
@@ -30,6 +34,7 @@ export interface Recipe {
   description: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
   prepTimeMinutes: number;
+  cookTime?: number;
   calories: number;
   ingredients: Ingredient[];
   steps: Step[];
@@ -69,6 +74,22 @@ export interface Meal {
 export interface DayPlan {
   day: number;
   meals: Meal[];
+}
+
+export interface MealPlan {
+  days: DayPlan[];
+}
+
+export interface NutritionalInfo {
+  calories: number;
+  protein: string;
+  carbs: string;
+  fat: string;
+  vitamins: string[];
+}
+
+export interface ShoppingList {
+  categories: ShoppingCategory[];
 }
 
 export interface SearchResult {

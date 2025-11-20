@@ -1,4 +1,4 @@
-import { GoogleGenAI, SchemaType } from "@google/genai";
+import { GoogleGenAI, Schema, Type } from "@google/genai";
 import { Recipe, Ingredient, MealPlan, NutritionalInfo, ShoppingList } from "../types";
 
 // Initialize the Google GenAI SDK
@@ -39,14 +39,14 @@ export async function identifyIngredientsFromImage(imageFile: File): Promise<Ing
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
-                    type: SchemaType.ARRAY,
+                    type: Type.ARRAY,
                     items: {
-                        type: SchemaType.OBJECT,
+                        type: Type.OBJECT,
                         properties: {
-                            name: { type: SchemaType.STRING },
-                            quantity: { type: SchemaType.STRING },
-                            unit: { type: SchemaType.STRING },
-                            category: { type: SchemaType.STRING }
+                            name: { type: Type.STRING },
+                            quantity: { type: Type.STRING },
+                            unit: { type: Type.STRING },
+                            category: { type: Type.STRING }
                         },
                         required: ["name", "category"]
                     }
@@ -54,7 +54,7 @@ export async function identifyIngredientsFromImage(imageFile: File): Promise<Ing
             }
         });
 
-        const jsonString = response.text();
+        const jsonString = response.text;
         if (!jsonString) return [];
         return JSON.parse(jsonString);
 
@@ -88,39 +88,39 @@ export async function analyzeFridgeAndSuggestRecipes(ingredients: Ingredient[], 
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
-                    type: SchemaType.ARRAY,
+                    type: Type.ARRAY,
                     items: {
-                        type: SchemaType.OBJECT,
+                        type: Type.OBJECT,
                         properties: {
-                            id: { type: SchemaType.STRING },
-                            title: { type: SchemaType.STRING },
-                            description: { type: SchemaType.STRING },
+                            id: { type: Type.STRING },
+                            title: { type: Type.STRING },
+                            description: { type: Type.STRING },
                             ingredients: {
-                                type: SchemaType.ARRAY,
+                                type: Type.ARRAY,
                                 items: {
-                                    type: SchemaType.OBJECT,
+                                    type: Type.OBJECT,
                                     properties: {
-                                        name: { type: SchemaType.STRING },
-                                        amount: { type: SchemaType.STRING },
-                                        unit: { type: SchemaType.STRING }
+                                        name: { type: Type.STRING },
+                                        amount: { type: Type.STRING },
+                                        unit: { type: Type.STRING }
                                     }
                                 }
                             },
                             steps: {
-                                type: SchemaType.ARRAY,
+                                type: Type.ARRAY,
                                 items: {
-                                    type: SchemaType.OBJECT,
+                                    type: Type.OBJECT,
                                     properties: {
-                                        instruction: { type: SchemaType.STRING },
-                                        duration: { type: SchemaType.NUMBER } // minutes
+                                        instruction: { type: Type.STRING },
+                                        duration: { type: Type.NUMBER } // minutes
                                     }
                                 }
                             },
-                            prepTime: { type: SchemaType.NUMBER },
-                            cookTime: { type: SchemaType.NUMBER },
-                            difficulty: { type: SchemaType.STRING, enum: ["Easy", "Medium", "Hard"] },
-                            calories: { type: SchemaType.NUMBER },
-                            tags: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
+                            prepTime: { type: Type.NUMBER },
+                            cookTime: { type: Type.NUMBER },
+                            difficulty: { type: Type.STRING, enum: ["Easy", "Medium", "Hard"] },
+                            calories: { type: Type.NUMBER },
+                            tags: { type: Type.ARRAY, items: { type: Type.STRING } }
                         },
                         required: ["title", "ingredients", "steps"]
                     }
@@ -128,7 +128,7 @@ export async function analyzeFridgeAndSuggestRecipes(ingredients: Ingredient[], 
             }
         });
 
-        const jsonString = response.text();
+        const jsonString = response.text;
         if (!jsonString) return [];
         return JSON.parse(jsonString);
 
@@ -164,7 +164,7 @@ export async function generateRecipeImage(recipeTitle: string, recipeDescription
 
         // Check for standard generation output
         const imagePart = response.candidates?.[0]?.content?.parts?.[0];
-        if (imagePart && 'inlineData' in imagePart) {
+        if (imagePart && 'inlineData' in imagePart && imagePart.inlineData) {
             return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
         }
 
@@ -197,44 +197,44 @@ export async function generateSurpriseRecipe(userProfile?: any): Promise<Recipe 
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
-                    type: SchemaType.OBJECT,
+                    type: Type.OBJECT,
                     properties: {
-                        id: { type: SchemaType.STRING },
-                        title: { type: SchemaType.STRING },
-                        description: { type: SchemaType.STRING },
+                        id: { type: Type.STRING },
+                        title: { type: Type.STRING },
+                        description: { type: Type.STRING },
                         ingredients: {
-                            type: SchemaType.ARRAY,
+                            type: Type.ARRAY,
                             items: {
-                                type: SchemaType.OBJECT,
+                                type: Type.OBJECT,
                                 properties: {
-                                    name: { type: SchemaType.STRING },
-                                    amount: { type: SchemaType.STRING },
-                                    unit: { type: SchemaType.STRING }
+                                    name: { type: Type.STRING },
+                                    amount: { type: Type.STRING },
+                                    unit: { type: Type.STRING }
                                 }
                             }
                         },
                         steps: {
-                            type: SchemaType.ARRAY,
+                            type: Type.ARRAY,
                             items: {
-                                type: SchemaType.OBJECT,
+                                type: Type.OBJECT,
                                 properties: {
-                                    instruction: { type: SchemaType.STRING },
-                                    duration: { type: SchemaType.NUMBER }
+                                    instruction: { type: Type.STRING },
+                                    duration: { type: Type.NUMBER }
                                 }
                             }
                         },
-                        prepTime: { type: SchemaType.NUMBER },
-                        cookTime: { type: SchemaType.NUMBER },
-                        difficulty: { type: SchemaType.STRING },
-                        calories: { type: SchemaType.NUMBER },
-                        tags: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
+                        prepTime: { type: Type.NUMBER },
+                        cookTime: { type: Type.NUMBER },
+                        difficulty: { type: Type.STRING },
+                        calories: { type: Type.NUMBER },
+                        tags: { type: Type.ARRAY, items: { type: Type.STRING } }
                     },
                     required: ["title", "ingredients", "steps"]
                 }
             }
         });
 
-        const jsonString = response.text();
+        const jsonString = response.text;
         if (!jsonString) return null;
         return JSON.parse(jsonString);
 
@@ -266,44 +266,44 @@ export async function remixRecipe(recipe: Recipe, instruction: string): Promise<
             config: {
                 responseMimeType: "application/json",
                 responseSchema: {
-                    type: SchemaType.OBJECT,
+                    type: Type.OBJECT,
                     properties: {
-                        id: { type: SchemaType.STRING },
-                        title: { type: SchemaType.STRING },
-                        description: { type: SchemaType.STRING },
+                        id: { type: Type.STRING },
+                        title: { type: Type.STRING },
+                        description: { type: Type.STRING },
                         ingredients: {
-                            type: SchemaType.ARRAY,
+                            type: Type.ARRAY,
                             items: {
-                                type: SchemaType.OBJECT,
+                                type: Type.OBJECT,
                                 properties: {
-                                    name: { type: SchemaType.STRING },
-                                    amount: { type: SchemaType.STRING },
-                                    unit: { type: SchemaType.STRING }
+                                    name: { type: Type.STRING },
+                                    amount: { type: Type.STRING },
+                                    unit: { type: Type.STRING }
                                 }
                             }
                         },
                         steps: {
-                            type: SchemaType.ARRAY,
+                            type: Type.ARRAY,
                             items: {
-                                type: SchemaType.OBJECT,
+                                type: Type.OBJECT,
                                 properties: {
-                                    instruction: { type: SchemaType.STRING },
-                                    duration: { type: SchemaType.NUMBER }
+                                    instruction: { type: Type.STRING },
+                                    duration: { type: Type.NUMBER }
                                 }
                             }
                         },
-                        prepTime: { type: SchemaType.NUMBER },
-                        cookTime: { type: SchemaType.NUMBER },
-                        difficulty: { type: SchemaType.STRING },
-                        calories: { type: SchemaType.NUMBER },
-                        tags: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } }
+                        prepTime: { type: Type.NUMBER },
+                        cookTime: { type: Type.NUMBER },
+                        difficulty: { type: Type.STRING },
+                        calories: { type: Type.NUMBER },
+                        tags: { type: Type.ARRAY, items: { type: Type.STRING } }
                     },
                     required: ["title", "ingredients", "steps"]
                 }
             }
         });
 
-        const jsonString = response.text();
+        const jsonString = response.text;
         if (!jsonString) return null;
         return JSON.parse(jsonString);
 
@@ -339,7 +339,7 @@ export async function generateMealPlan(userProfile: any, pantryIngredients: Ingr
             }
         });
 
-        const jsonString = response.text();
+        const jsonString = response.text;
         if (!jsonString) return null;
         return JSON.parse(jsonString);
 
@@ -372,7 +372,7 @@ export async function getNutritionalInsights(recipe: Recipe): Promise<Nutritiona
             }
         });
 
-        const jsonString = response.text();
+        const jsonString = response.text;
         if (!jsonString) return null;
         return JSON.parse(jsonString);
 
@@ -405,7 +405,7 @@ export async function organizeShoppingList(items: string[]): Promise<ShoppingLis
             }
         });
 
-        const jsonString = response.text();
+        const jsonString = response.text;
         if (!jsonString) return null;
         return JSON.parse(jsonString);
 
@@ -443,7 +443,7 @@ export async function processShoppingVoiceCommand(audioBlob: Blob): Promise<stri
             }
         });
 
-        const jsonString = response.text();
+        const jsonString = response.text;
         if (!jsonString) return [];
         return JSON.parse(jsonString);
 
