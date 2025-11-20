@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Recipe, ChefPersonality } from '../types';
 import { X, ChevronLeft, ChevronRight, Volume2, VolumeX, CheckCircle, Star, Send, Mic, MicOff, Loader2, Camera, UserCog, Heart, Flame, Bot, ChefHat, RefreshCcw } from 'lucide-react';
-import { GeminiLiveSession } from '../services/liveApiService';
+import { GeminiLiveSession, AudioRecorder } from '../services/liveApiService';
 
 interface CookingModeProps {
     recipe: Recipe;
@@ -28,9 +28,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sessionRef = useRef<GeminiLiveSession | null>(null);
-    const audioContextRef = useRef<AudioContext | null>(null);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const audioStreamRef = useRef<MediaStream | null>(null);
+    const recorderRef = useRef<AudioRecorder | null>(null);
     const videoStreamRef = useRef<MediaStream | null>(null);
     const videoIntervalRef = useRef<number | null>(null);
     const [volume, setVolume] = useState(0);
@@ -110,16 +108,6 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
                 return;
             }
 
-            // Setup Audio Context
-            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
-                sampleRate: 24000
-            });
-            await audioContextRef.current.resume();
-
-            // Get Mic Stream
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioStreamRef.current = stream;
-
             const currentPersona = personaOverride || personality;
             const personaConfig = getPersonalityConfig(currentPersona);
 
@@ -130,48 +118,22 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
                     setIsLiveConnected(true);
                     setIsLiveLoading(false);
 
-                    // Setup audio capture using MediaRecorder
-                    if (stream && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                        const mediaRecorder = new MediaRecorder(stream, {
-                            mimeType: 'audio/webm;codecs=opus',
-                            audioBitsPerSecond: 128000
-                        });
+                    // Start Audio Recorder (16kHz)
+                    recorderRef.current = new AudioRecorder((data) => {
+                        // Calculate volume for visual feedback
+                        let sum = 0;
+                        for (let i = 0; i < data.length; i++) {
+                            sum += data[i] * data[i];
+                        }
+                        const rms = Math.sqrt(sum / data.length);
+                        setVolume(Math.min(100, rms * 500));
 
-                        mediaRecorderRef.current = mediaRecorder;
-
-                        // Send audio chunks in real-time
-                        mediaRecorder.ondataavailable = async (event) => {
-                            if (event.data.size > 0 && sessionRef.current) {
-                                try {
-                                    // Convert blob to PCM and send
-                                    const arrayBuffer = await event.data.arrayBuffer();
-
-                                    // Process as PCM audio chunks
-                                    const tempContext = new AudioContext({ sampleRate: 24000 });
-                                    const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
-                                    const pcmData = audioBuffer.getChannelData(0);
-
-                                    // Calculate volume for visual feedback
-                                    let sum = 0;
-                                    for (let i = 0; i < pcmData.length; i++) {
-                                        sum += pcmData[i] * pcmData[i];
-                                    }
-                                    const rms = Math.sqrt(sum / pcmData.length);
-                                    setVolume(Math.min(100, rms * 500));
-
-                                    // Send audio to session
-                                    sessionRef.current.sendAudio(pcmData);
-
-                                    await tempContext.close();
-                                } catch (error) {
-                                    console.error("Error processing audio:", error);
-                                }
-                            }
-                        };
-
-                        // Start recording in chunks
-                        mediaRecorder.start(100); // Record in 100ms chunks
-                    }
+                        // Send to session
+                        if (sessionRef.current) {
+                            sessionRef.current.sendAudio(data);
+                        }
+                    });
+                    recorderRef.current.start();
 
                     // Start Video Loop if enabled
                     if (isVideoEnabled) {
@@ -179,7 +141,7 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
                     }
                 },
                 onMessage: (msg) => {
-                    console.log('Received message:', msg);
+                    // console.log('Received message:', msg);
                 },
                 onError: (error) => {
                     console.error("Live Session Error", error);
@@ -296,32 +258,10 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
     };
 
     const stopLiveSession = async () => {
-        // Stop media recorder
-        if (mediaRecorderRef.current) {
-            try {
-                if (mediaRecorderRef.current.state !== 'inactive') {
-                    mediaRecorderRef.current.stop();
-                }
-            } catch (e) {
-                console.error("Error stopping media recorder:", e);
-            }
-            mediaRecorderRef.current = null;
-        }
-
-        // Stop audio stream
-        if (audioStreamRef.current) {
-            audioStreamRef.current.getTracks().forEach(track => track.stop());
-            audioStreamRef.current = null;
-        }
-
-        // Properly close audio context (async)
-        if (audioContextRef.current) {
-            try {
-                await audioContextRef.current.close();
-            } catch (e) {
-                console.error("Error closing audio context:", e);
-            }
-            audioContextRef.current = null;
+        // Stop recorder
+        if (recorderRef.current) {
+            recorderRef.current.stop();
+            recorderRef.current = null;
         }
 
         // Stop video processing
@@ -355,9 +295,10 @@ export const CookingMode: React.FC<CookingModeProps> = ({ recipe, onClose }) => 
         setShowPersonaSelector(false);
 
         if (wasConnected) {
-            stopLiveSession();
-            // Small delay to allow cleanup before reconnecting with new persona
-            setTimeout(() => startLiveSession(p), 200);
+            stopLiveSession().then(() => {
+                // Small delay to allow cleanup before reconnecting with new persona
+                setTimeout(() => startLiveSession(p), 200);
+            });
         }
     };
 

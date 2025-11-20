@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChefPersonality } from '../types';
 import { Mic, MicOff, Video, VideoOff, Loader2, UserCog, Radio, MessageSquare, Bot, Flame, Heart, ChefHat, RefreshCcw } from 'lucide-react';
-import { GeminiLiveSession } from '../services/liveApiService';
+import { GeminiLiveSession, AudioRecorder } from '../services/liveApiService';
 
 export const KitchenAssistant: React.FC = () => {
     const [isLiveConnected, setIsLiveConnected] = useState(false);
@@ -16,11 +16,9 @@ export const KitchenAssistant: React.FC = () => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sessionRef = useRef<GeminiLiveSession | null>(null);
-    const audioContextRef = useRef<AudioContext | null>(null);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const recorderRef = useRef<AudioRecorder | null>(null);
     const videoStreamRef = useRef<MediaStream | null>(null);
     const videoIntervalRef = useRef<number | null>(null);
-    const audioStreamRef = useRef<MediaStream | null>(null);
 
     useEffect(() => {
         return () => {
@@ -75,16 +73,6 @@ export const KitchenAssistant: React.FC = () => {
                 return;
             }
 
-            // Create audio context for audio playback
-            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
-                sampleRate: 24000
-            });
-            await audioContextRef.current.resume();
-
-            // Get microphone stream
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioStreamRef.current = stream;
-
             const personaConfig = getPersonalityConfig(personality);
 
             // Create the live session using the proper SDK implementation
@@ -94,48 +82,22 @@ export const KitchenAssistant: React.FC = () => {
                     setIsLiveConnected(true);
                     setIsLiveLoading(false);
 
-                    // Setup audio capture using MediaRecorder
-                    if (stream && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-                        const mediaRecorder = new MediaRecorder(stream, {
-                            mimeType: 'audio/webm;codecs=opus',
-                            audioBitsPerSecond: 128000
-                        });
+                    // Start Audio Recorder (16kHz)
+                    recorderRef.current = new AudioRecorder((data) => {
+                        // Calculate volume for visual feedback
+                        let sum = 0;
+                        for (let i = 0; i < data.length; i++) {
+                            sum += data[i] * data[i];
+                        }
+                        const rms = Math.sqrt(sum / data.length);
+                        setVolume(Math.min(100, rms * 500));
 
-                        mediaRecorderRef.current = mediaRecorder;
-
-                        // Send audio chunks in real-time
-                        mediaRecorder.ondataavailable = async (event) => {
-                            if (event.data.size > 0 && sessionRef.current) {
-                                try {
-                                    // Convert blob to PCM and send
-                                    const arrayBuffer = await event.data.arrayBuffer();
-
-                                    // Process as PCM audio chunks
-                                    const tempContext = new AudioContext({ sampleRate: 24000 });
-                                    const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
-                                    const pcmData = audioBuffer.getChannelData(0);
-
-                                    // Calculate volume for visual feedback
-                                    let sum = 0;
-                                    for (let i = 0; i < pcmData.length; i++) {
-                                        sum += pcmData[i] * pcmData[i];
-                                    }
-                                    const rms = Math.sqrt(sum / pcmData.length);
-                                    setVolume(Math.min(100, rms * 500));
-
-                                    // Send audio to session
-                                    sessionRef.current.sendAudio(pcmData);
-
-                                    await tempContext.close();
-                                } catch (error) {
-                                    console.error('Error processing audio:', error);
-                                }
-                            }
-                        };
-
-                        // Start recording in chunks
-                        mediaRecorder.start(100); // Record in 100ms chunks
-                    }
+                        // Send to session
+                        if (sessionRef.current) {
+                            sessionRef.current.sendAudio(data);
+                        }
+                    });
+                    recorderRef.current.start();
 
                     // Start video if enabled
                     if (isVideoEnabled) {
@@ -143,7 +105,7 @@ export const KitchenAssistant: React.FC = () => {
                     }
                 },
                 onMessage: (msg) => {
-                    console.log('Received message:', msg);
+                    // console.log('Received message:', msg);
                 },
                 onError: (error) => {
                     console.error('Session error:', error);
@@ -248,32 +210,10 @@ export const KitchenAssistant: React.FC = () => {
     };
 
     const stopLiveSession = async () => {
-        // Stop media recorder
-        if (mediaRecorderRef.current) {
-            try {
-                if (mediaRecorderRef.current.state !== 'inactive') {
-                    mediaRecorderRef.current.stop();
-                }
-            } catch (e) {
-                console.error("Error stopping media recorder:", e);
-            }
-            mediaRecorderRef.current = null;
-        }
-
-        // Stop audio stream
-        if (audioStreamRef.current) {
-            audioStreamRef.current.getTracks().forEach(track => track.stop());
-            audioStreamRef.current = null;
-        }
-
-        // Close audio context
-        if (audioContextRef.current) {
-            try {
-                await audioContextRef.current.close();
-            } catch (e) {
-                console.error("Error closing audio context:", e);
-            }
-            audioContextRef.current = null;
+        // Stop recorder
+        if (recorderRef.current) {
+            recorderRef.current.stop();
+            recorderRef.current = null;
         }
 
         // Stop video

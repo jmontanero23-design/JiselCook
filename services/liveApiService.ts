@@ -1,6 +1,6 @@
 // Gemini Live API Service - Proper SDK Implementation
 // Using @google/genai v1.30.0 with native Live API support
-// November 2025 - Using gemini-2.0-flash-exp model for best audio quality and natural conversations
+// November 2025 - Using gemini-2.5-flash-live-preview model for best audio quality and natural conversations
 
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 
@@ -15,7 +15,7 @@ export interface LiveSessionConfig {
 
 export class GeminiLiveSession {
     private session: any = null;
-    private audioContext: AudioContext | null = null;
+    private outputAudioContext: AudioContext | null = null;
     private nextStartTime = 0;
     private ai: GoogleGenAI;
 
@@ -29,14 +29,14 @@ export class GeminiLiveSession {
     async connect() {
         try {
             // Create audio context for playback (24kHz output)
-            this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+            this.outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
                 sampleRate: 24000
             });
-            await this.audioContext.resume();
+            await this.outputAudioContext.resume();
 
             // Connect to Live API using SDK's built-in method
             this.session = await this.ai.live.connect({
-                model: 'gemini-2.0-flash-exp',
+                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                 callbacks: {
                     onopen: () => {
                         console.log('✅ Live API Session Opened');
@@ -45,11 +45,9 @@ export class GeminiLiveSession {
                         this.sendText("Hello! I'm ready to cook.");
                     },
                     onmessage: async (msg: LiveServerMessage) => {
-                        // console.log('📨 Received message from Live API:', msg);
                         // Handle audio response
                         const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
                         if (audioData) {
-                            // console.log('🔊 Playing audio response');
                             await this.playAudio(audioData);
                         }
                         this.config.onMessage?.(msg);
@@ -110,25 +108,22 @@ export class GeminiLiveSession {
 
     sendAudio(audioData: Float32Array) {
         if (!this.session) {
-            console.warn('Session not ready');
+            // console.warn('Session not ready');
             return;
         }
 
         const base64Data = this.base64EncodeAudio(audioData);
 
         try {
-            // Use the correct method name for the SDK
             if (typeof this.session.send === 'function') {
                 this.session.send({
                     realtimeInput: {
                         mediaChunks: [{
-                            mimeType: 'audio/pcm;rate=24000',
+                            mimeType: 'audio/pcm;rate=16000', // Input is 16kHz
                             data: base64Data
                         }]
                     }
                 });
-            } else {
-                console.error('❌ No valid send method found on session');
             }
         } catch (error) {
             console.error('❌ Error sending audio:', error);
@@ -155,10 +150,7 @@ export class GeminiLiveSession {
     }
 
     sendImage(base64Image: string) {
-        if (!this.session) {
-            console.warn('Session not ready');
-            return;
-        }
+        if (!this.session) return;
 
         try {
             if (typeof this.session.send === 'function') {
@@ -177,7 +169,7 @@ export class GeminiLiveSession {
     }
 
     private async playAudio(base64Data: string) {
-        if (!this.audioContext) return;
+        if (!this.outputAudioContext) return;
 
         try {
             // Decode base64 to audio
@@ -195,15 +187,15 @@ export class GeminiLiveSession {
             }
 
             // Create and play audio buffer
-            const audioBuffer = this.audioContext.createBuffer(1, float32Array.length, 24000);
+            const audioBuffer = this.outputAudioContext.createBuffer(1, float32Array.length, 24000);
             audioBuffer.getChannelData(0).set(float32Array);
 
-            const source = this.audioContext.createBufferSource();
+            const source = this.outputAudioContext.createBufferSource();
             source.buffer = audioBuffer;
-            source.connect(this.audioContext.destination);
+            source.connect(this.outputAudioContext.destination);
 
             // Schedule playback to avoid overlapping
-            const currentTime = this.audioContext.currentTime;
+            const currentTime = this.outputAudioContext.currentTime;
             if (this.nextStartTime < currentTime) {
                 this.nextStartTime = currentTime;
             }
@@ -216,32 +208,92 @@ export class GeminiLiveSession {
 
     async disconnect() {
         if (this.session) {
-            try {
-                // The SDK's session doesn't have a disconnect method,
-                // but we can stop sending/receiving
-                this.session = null;
-            } catch (e) {
-                console.error('Error disconnecting:', e);
-            }
+            this.session = null;
         }
         await this.cleanup();
     }
 
     private async cleanup() {
-        if (this.audioContext) {
+        if (this.outputAudioContext) {
             try {
-                await this.audioContext.close();
+                await this.outputAudioContext.close();
             } catch (e) {
                 console.error('Error closing audio context:', e);
             }
-            this.audioContext = null;
+            this.outputAudioContext = null;
         }
         this.nextStartTime = 0;
         this.session = null;
     }
 }
 
-// Helper function to create a simplified Live API session
+// Helper class for recording audio at 16kHz
+export class AudioRecorder {
+    private audioContext: AudioContext | null = null;
+    private mediaStream: MediaStream | null = null;
+    private processor: ScriptProcessorNode | null = null;
+    private input: MediaStreamAudioSourceNode | null = null;
+
+    constructor(private onAudioData: (data: Float32Array) => void) { }
+
+    async start() {
+        try {
+            this.mediaStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    sampleRate: 16000,
+                    channelCount: 1,
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
+
+            this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+                sampleRate: 16000
+            });
+
+            this.input = this.audioContext.createMediaStreamSource(this.mediaStream);
+
+            // Use ScriptProcessor for broad compatibility (AudioWorklet is better but requires separate file)
+            // Buffer size 4096 gives ~250ms latency, 2048 ~128ms. 
+            // We want low latency but stable.
+            this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+
+            this.processor.onaudioprocess = (e) => {
+                const inputData = e.inputBuffer.getChannelData(0);
+                // Clone the data to avoid race conditions
+                this.onAudioData(new Float32Array(inputData));
+            };
+
+            this.input.connect(this.processor);
+            this.processor.connect(this.audioContext.destination); // Needed for Chrome to activate
+
+        } catch (error) {
+            console.error("Error starting audio recorder:", error);
+            throw error;
+        }
+    }
+
+    stop() {
+        if (this.mediaStream) {
+            this.mediaStream.getTracks().forEach(track => track.stop());
+            this.mediaStream = null;
+        }
+        if (this.processor) {
+            this.processor.disconnect();
+            this.processor = null;
+        }
+        if (this.input) {
+            this.input.disconnect();
+            this.input = null;
+        }
+        if (this.audioContext) {
+            this.audioContext.close();
+            this.audioContext = null;
+        }
+    }
+}
+
 export async function createLiveSession(
     apiKey: string,
     config: LiveSessionConfig

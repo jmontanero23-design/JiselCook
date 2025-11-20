@@ -93,51 +93,59 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
     }
   };
 
+  const isScanningRef = useRef(false);
+
   const startContinuousAnalysis = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
+
     intervalRef.current = window.setInterval(async () => {
-      if (videoRef.current && videoRef.current.readyState === 4) {
-        const canvas = document.createElement('canvas');
-        canvas.width = videoRef.current.videoWidth / 4; // Low res for speed
-        canvas.height = videoRef.current.videoHeight / 4;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-          const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
+      // Skip if already scanning or video not ready
+      if (isScanningRef.current || !videoRef.current || videoRef.current.readyState !== 4) return;
 
-          setLiveLabel("Scanning...");
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth / 4; // Low res for speed
+      canvas.height = videoRef.current.videoHeight / 4;
+      const ctx = canvas.getContext('2d');
 
-          try {
-            const ingredients = await identifyIngredientsFromImage(base64Data);
-            if (ingredients.length > 0) {
-              setLiveLabel(`Found: ${ingredients.join(', ')}`);
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const base64Data = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
 
-              // Update local state and notify parent
-              setDetectedIngredients(prev => {
-                const newSet = new Set(prev);
-                let hasNew = false;
-                ingredients.forEach(ing => {
-                  if (!newSet.has(ing)) {
-                    newSet.add(ing);
-                    hasNew = true;
-                  }
-                });
+        setLiveLabel("Scanning...");
+        isScanningRef.current = true; // Lock
 
-                if (hasNew && onIngredientsDetected) {
-                  onIngredientsDetected(Array.from(newSet));
+        try {
+          const ingredients = await identifyIngredientsFromImage(base64Data);
+          if (ingredients.length > 0) {
+            setLiveLabel(`Found: ${ingredients.join(', ')}`);
+
+            // Update local state and notify parent
+            setDetectedIngredients(prev => {
+              const newSet = new Set(prev);
+              let hasNew = false;
+              ingredients.forEach(ing => {
+                if (!newSet.has(ing)) {
+                  newSet.add(ing);
+                  hasNew = true;
                 }
-                return newSet;
               });
 
-            } else {
-              setLiveLabel("Scanning...");
-            }
-          } catch (e) {
-            console.error("Quick scan failed", e);
+              if (hasNew && onIngredientsDetected) {
+                onIngredientsDetected(Array.from(newSet));
+              }
+              return newSet;
+            });
+
+          } else {
+            setLiveLabel("Scanning...");
           }
+        } catch (e) {
+          console.error("Quick scan failed", e);
+        } finally {
+          isScanningRef.current = false; // Unlock
         }
       }
-    }, 2000); // Scan every 2 seconds for faster feedback
+    }, 2000); // Scan every 2 seconds, but respects the lock
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
