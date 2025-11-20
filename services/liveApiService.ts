@@ -115,14 +115,12 @@ export class GeminiLiveSession {
         const base64Data = this.base64EncodeAudio(audioData);
 
         try {
-            if (typeof this.session.send === 'function') {
-                this.session.send({
-                    realtimeInput: {
-                        mediaChunks: [{
-                            mimeType: 'audio/pcm;rate=16000', // Input is 16kHz
-                            data: base64Data
-                        }]
-                    }
+            if (typeof this.session.sendRealtimeInput === 'function') {
+                this.session.sendRealtimeInput({
+                    mediaChunks: [{
+                        mimeType: 'audio/pcm;rate=16000', // Input is 16kHz
+                        data: base64Data
+                    }]
                 });
             }
         } catch (error) {
@@ -133,15 +131,13 @@ export class GeminiLiveSession {
     sendText(text: string) {
         if (!this.session) return;
         try {
-            if (typeof this.session.send === 'function') {
-                this.session.send({
-                    clientContent: {
-                        turns: [{
-                            role: 'user',
-                            parts: [{ text }]
-                        }],
-                        turnComplete: true
-                    }
+            if (typeof this.session.sendClientContent === 'function') {
+                this.session.sendClientContent({
+                    turns: [{
+                        role: 'user',
+                        parts: [{ text }]
+                    }],
+                    turnComplete: true
                 });
             }
         } catch (error) {
@@ -153,14 +149,12 @@ export class GeminiLiveSession {
         if (!this.session) return;
 
         try {
-            if (typeof this.session.send === 'function') {
-                this.session.send({
-                    realtimeInput: {
-                        mediaChunks: [{
-                            mimeType: 'image/jpeg',
-                            data: base64Image
-                        }]
-                    }
+            if (typeof this.session.sendRealtimeInput === 'function') {
+                this.session.sendRealtimeInput({
+                    mediaChunks: [{
+                        mimeType: 'image/jpeg',
+                        data: base64Image
+                    }]
                 });
             }
         } catch (error) {

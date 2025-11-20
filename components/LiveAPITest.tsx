@@ -64,15 +64,13 @@ export const LiveAPITest: React.FC = () => {
                     console.log('Session keys:', Object.keys(currentSession));
                     console.log('Session prototype:', Object.getPrototypeOf(currentSession));
 
-                    if (typeof currentSession.send === 'function') {
-                        currentSession.send({
-                            clientContent: {
-                                turns: [{
-                                    role: 'user',
-                                    parts: [{ text: 'Hello, can you hear me?' }]
-                                }],
-                                turnComplete: true
-                            }
+                    if (typeof currentSession.sendClientContent === 'function') {
+                        currentSession.sendClientContent({
+                            turns: [{
+                                role: 'user',
+                                parts: [{ text: 'Hello, can you hear me?' }]
+                            }],
+                            turnComplete: true
                         });
                         addLog('✅ Message sent');
                     } else {
