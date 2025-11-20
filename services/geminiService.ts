@@ -14,7 +14,7 @@ const MODEL_COMPLEX = "gemini-3-pro-preview";
 const MODEL_FAST = "gemini-2.5-flash";
 
 // Image Generation
-const MODEL_IMAGE = "imagen-4.0-generate-001";
+const MODEL_IMAGE = "imagen-3.0-generate-001";
 
 
 export async function identifyIngredientsFromImage(imageFile: File): Promise<Ingredient[]> {

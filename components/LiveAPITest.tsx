@@ -60,6 +60,10 @@ export const LiveAPITest: React.FC = () => {
                 addLog('Sending test message...');
                 try {
                     const currentSession = session as any;
+                    console.log('Session object:', currentSession);
+                    console.log('Session keys:', Object.keys(currentSession));
+                    console.log('Session prototype:', Object.getPrototypeOf(currentSession));
+
                     if (typeof currentSession.send === 'function') {
                         currentSession.send({
                             clientContent: {
