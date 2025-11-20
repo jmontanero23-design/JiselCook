@@ -115,7 +115,17 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
         isScanningRef.current = true; // Lock
 
         try {
-          const ingredients = await identifyIngredientsFromImage(base64Data);
+          // Convert base64 to File for the service
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/jpeg' });
+          const file = new File([blob], "scan.jpg", { type: 'image/jpeg' });
+
+          const ingredients = await identifyIngredientsFromImage(file);
           if (ingredients.length > 0) {
             setLiveLabel(`Found: ${ingredients.join(', ')}`);
 
@@ -124,8 +134,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({ onImageCaptured, o
               const newSet = new Set(prev);
               let hasNew = false;
               ingredients.forEach(ing => {
-                if (!newSet.has(ing)) {
-                  newSet.add(ing);
+                if (!newSet.has(ing.name)) {
+                  newSet.add(ing.name);
                   hasNew = true;
                 }
               });
