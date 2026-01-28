@@ -6,16 +6,16 @@ import { Recipe, Ingredient, MealPlan, NutritionalInfo, ShoppingList } from "../
 const apiKey = import.meta.env.VITE_API_KEY;
 const genAI = new GoogleGenAI({ apiKey: apiKey || '' });
 
-// --- Model Constants ---
+// --- Model Constants (Updated January 2026) ---
 // Complex Reasoning & Vision (Fridge Scan, Meal Plans, Nutrition)
-// Using gemini-1.5-pro for best vision and complex reasoning capabilities
-const MODEL_COMPLEX = "gemini-1.5-pro";
+// Using gemini-2.5-flash - stable, supports vision, 1M token context
+const MODEL_COMPLEX = "gemini-2.5-flash";
 
 // Fast & Efficient (Voice Commands, Simple Text)
-// Using gemini-1.5-flash for quick responses
-const MODEL_FAST = "gemini-1.5-flash";
+// Using gemini-2.5-flash-lite - fastest, most cost-efficient
+const MODEL_FAST = "gemini-2.5-flash-lite";
 
-// Note: Image generation now uses OpenAI DALL-E via imageGenerationService.ts
+// Note: Image generation uses OpenAI DALL-E via imageGenerationService.ts
 
 
 export async function identifyIngredientsFromImage(imageFile: File): Promise<Ingredient[]> {

@@ -9,8 +9,8 @@ if (!apiKey) {
 
 const genAI = new GoogleGenAI({ apiKey: apiKey || '' });
 
-// Use fast model for cultural context (not complex reasoning)
-const MODEL_FAST = 'gemini-1.5-flash';
+// Use fast model for cultural context (January 2026 - latest stable)
+const MODEL_FAST = 'gemini-2.5-flash-lite';
 
 /**
  * Generate cultural story and context for a recipe

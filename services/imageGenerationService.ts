@@ -1,16 +1,18 @@
 /**
- * Image Generation Service
+ * Image Generation Service (January 2026)
  *
  * Provides robust image generation using multiple AI providers:
- * 1. HuggingFace Stable Diffusion (primary)
- * 2. OpenAI DALL-E (fallback)
- * 3. Imagen 3.0 (fallback)
+ * 1. OpenAI DALL-E 3 (primary - best quality)
+ * 2. Google Gemini Imagen 4.0 (fallback)
+ * 3. HuggingFace Stable Diffusion (fallback)
+ * 4. Beautiful gradient placeholder (final fallback)
  *
  * This ensures images ALWAYS generate successfully.
  */
 
 const HF_API_KEY = import.meta.env.VITE_HF_API_KEY;
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+const GEMINI_API_KEY = import.meta.env.VITE_API_KEY;
 
 // HuggingFace models
 const HF_MODELS = {
@@ -156,6 +158,60 @@ async function generateWithOpenAI(prompt: string): Promise<ImageGenerationResult
 }
 
 /**
+ * Generate image using Google Gemini Imagen 4.0
+ */
+async function generateWithGeminiImagen(prompt: string): Promise<ImageGenerationResult> {
+  if (!GEMINI_API_KEY) {
+    console.warn('⚠️ No Gemini API key');
+    return { success: false, imageUrl: null, provider: 'imagen', error: 'No API key' };
+  }
+
+  try {
+    console.log('🎨 Generating image with Gemini Imagen 4.0...');
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instances: [{ prompt }],
+          parameters: {
+            sampleCount: 1,
+            aspectRatio: '1:1',
+            safetyFilterLevel: 'block_few',
+            personGeneration: 'allow_adult',
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Gemini Imagen error:', response.status, errorText);
+      return { success: false, imageUrl: null, provider: 'imagen', error: errorText };
+    }
+
+    const data = await response.json();
+    const base64Image = data.predictions?.[0]?.bytesBase64Encoded;
+
+    if (!base64Image) {
+      return { success: false, imageUrl: null, provider: 'imagen', error: 'No image data' };
+    }
+
+    const imageUrl = `data:image/png;base64,${base64Image}`;
+    console.log('✅ Gemini Imagen image generated successfully');
+    return { success: true, imageUrl, provider: 'imagen' };
+
+  } catch (error: any) {
+    console.error('❌ Gemini Imagen generation failed:', error);
+    return { success: false, imageUrl: null, provider: 'imagen', error: error.message };
+  }
+}
+
+/**
  * Fallback: Return a beautiful gradient placeholder
  */
 function getFallbackImage(recipeTitle: string): ImageGenerationResult {
@@ -223,18 +279,32 @@ export async function generateRecipeImage(
     if (result.success && result.imageUrl) {
       return result.imageUrl;
     }
-    console.warn('⚠️ OpenAI failed, trying HuggingFace...');
+    console.warn('⚠️ OpenAI failed, trying Gemini Imagen...');
   }
 
-  // Try HuggingFace as fallback
-  let result = await generateWithHuggingFace(prompt);
-  if (result.success && result.imageUrl) {
-    return result.imageUrl;
+  // Try Gemini Imagen as second option
+  if (GEMINI_API_KEY) {
+    console.log('🎯 Trying Gemini Imagen 4.0...');
+    const result = await generateWithGeminiImagen(prompt);
+    if (result.success && result.imageUrl) {
+      return result.imageUrl;
+    }
+    console.warn('⚠️ Gemini Imagen failed, trying HuggingFace...');
+  }
+
+  // Try HuggingFace as third option
+  if (HF_API_KEY) {
+    console.log('🎯 Trying HuggingFace Stable Diffusion...');
+    const result = await generateWithHuggingFace(prompt);
+    if (result.success && result.imageUrl) {
+      return result.imageUrl;
+    }
+    console.warn('⚠️ HuggingFace failed...');
   }
 
   // Final fallback: Beautiful gradient placeholder
   console.log('⚠️ All image APIs failed, using gradient fallback');
-  result = getFallbackImage(recipeTitle);
+  const result = getFallbackImage(recipeTitle);
   return result.imageUrl;
 }
 
