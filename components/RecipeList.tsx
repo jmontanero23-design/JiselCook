@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Recipe } from '../types';
 import { Clock, Flame, ChefHat, AlertTriangle, ArrowRight, Star } from 'lucide-react';
 
@@ -7,30 +8,90 @@ interface RecipeListProps {
   onSelectRecipe: (recipe: Recipe) => void;
 }
 
+// Animation variants for staggered entrance
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2
+    }
+  }
+};
+
+const cardVariants = {
+  hidden: {
+    opacity: 0,
+    y: 20,
+    scale: 0.95
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+      damping: 15
+    }
+  }
+};
+
 export const RecipeList: React.FC<RecipeListProps> = ({ recipes, onSelectRecipe }) => {
   if (recipes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center">
-        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex flex-col items-center justify-center h-full text-slate-400 p-8 text-center"
+      >
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4"
+        >
           <ChefHat size={40} className="text-slate-300" />
-        </div>
+        </motion.div>
         <h3 className="text-lg font-medium text-slate-600">No recipes yet</h3>
         <p className="max-w-md mt-2">Scan your fridge to generate personalized recipe suggestions based on your ingredients and pantry.</p>
-      </div>
+      </motion.div>
     );
   }
 
   return (
     <div className="p-6 overflow-y-auto h-full">
-      <h2 className="text-2xl font-bold text-slate-800 mb-6">Suggested Recipes</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {recipes.map((recipe) => {
+      <motion.h2
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.4 }}
+        className="text-2xl font-bold text-slate-800 mb-6"
+      >
+        Suggested Recipes
+      </motion.h2>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      >
+        {recipes.map((recipe, index) => {
             const missingCount = recipe.ingredients.filter(i => i.isMissing).length;
-            
+
             return (
-              <div 
-                key={recipe.id} 
-                className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col"
+              <motion.div
+                key={recipe.id}
+                variants={cardVariants}
+                whileHover={{
+                  scale: 1.02,
+                  y: -8,
+                  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                  transition: { duration: 0.2 }
+                }}
+                whileTap={{ scale: 0.98 }}
+                className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col cursor-pointer"
               >
                 <div className="h-48 bg-gradient-to-br from-emerald-100 to-teal-50 flex items-center justify-center relative overflow-hidden group">
                   {recipe.imageUrl ? (
@@ -84,18 +145,28 @@ export const RecipeList: React.FC<RecipeListProps> = ({ recipes, onSelectRecipe 
                     </div>
                   )}
 
-                  <button
+                  <motion.button
                     onClick={() => onSelectRecipe(recipe)}
-                    className="w-full mt-auto bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-4 rounded-lg font-medium text-sm flex items-center justify-center space-x-2 transition-colors"
+                    whileHover={{
+                      scale: 1.03,
+                      boxShadow: "0 10px 20px -5px rgba(0, 0, 0, 0.3)"
+                    }}
+                    whileTap={{ scale: 0.97 }}
+                    className="w-full mt-auto bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-white py-2.5 px-4 rounded-lg font-medium text-sm flex items-center justify-center space-x-2 transition-all duration-200 shadow-md"
                   >
                     <span>View Recipe</span>
-                    <ArrowRight size={16} />
-                  </button>
+                    <motion.div
+                      animate={{ x: [0, 4, 0] }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      <ArrowRight size={16} />
+                    </motion.div>
+                  </motion.button>
                 </div>
-              </div>
+              </motion.div>
             );
         })}
-      </div>
+      </motion.div>
     </div>
   );
 };
