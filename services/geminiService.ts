@@ -8,13 +8,14 @@ const genAI = new GoogleGenAI({ apiKey: apiKey || '' });
 
 // --- Model Constants ---
 // Complex Reasoning & Vision (Fridge Scan, Meal Plans, Nutrition)
-const MODEL_COMPLEX = "gemini-3-pro-preview";
+// Using gemini-1.5-pro for best vision and complex reasoning capabilities
+const MODEL_COMPLEX = "gemini-1.5-pro";
 
 // Fast & Efficient (Voice Commands, Simple Text)
-const MODEL_FAST = "gemini-2.5-flash";
+// Using gemini-1.5-flash for quick responses
+const MODEL_FAST = "gemini-1.5-flash";
 
-// Image Generation
-const MODEL_IMAGE = "imagen-3.0-generate-001";
+// Note: Image generation now uses OpenAI DALL-E via imageGenerationService.ts
 
 
 export async function identifyIngredientsFromImage(imageFile: File): Promise<Ingredient[]> {

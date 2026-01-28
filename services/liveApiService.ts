@@ -1,6 +1,6 @@
 // Gemini Live API Service - Proper SDK Implementation
-// Using @google/genai v1.30.0 with native Live API support
-// November 2025 - Using gemini-2.5-flash-live-preview model for best audio quality and natural conversations
+// Using @google/genai with native Live API support
+// Using gemini-2.0-flash-live-001 for real-time audio conversations
 
 import { GoogleGenAI, Modality, LiveServerMessage } from '@google/genai';
 
@@ -36,7 +36,7 @@ export class GeminiLiveSession {
 
             // Connect to Live API using SDK's built-in method
             this.session = await this.ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+                model: 'gemini-2.0-flash-live-001',
                 callbacks: {
                     onopen: () => {
                         console.log('✅ Live API Session Opened');
