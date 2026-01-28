@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { CulturalStory, Recipe } from '../types';
 
 const apiKey = import.meta.env.VITE_API_KEY;
@@ -7,7 +7,7 @@ if (!apiKey) {
   throw new Error('VITE_API_KEY is required for Gemini AI');
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = new GoogleGenAI({ apiKey: apiKey || '' });
 
 // Use fast model for cultural context (not complex reasoning)
 const MODEL_FAST = 'gemini-2.5-flash';
