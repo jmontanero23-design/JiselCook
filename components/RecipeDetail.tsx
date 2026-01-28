@@ -3,6 +3,7 @@ import { Recipe, SearchResult } from '../types';
 import { Clock, Flame, ChefHat, ArrowLeft, PlayCircle, Plus, Check, Star, Wand2, Image as ImageIcon, Loader2, Wine, BookOpen, ExternalLink, Info, Activity, Heart, Zap, ShoppingBag, Share2 } from 'lucide-react';
 import { remixRecipe, generateRecipeImage, getNutritionalInsights } from '../services/geminiService';
 import { NutritionalInfo } from '../types';
+import { CulturalStoryPanel } from './CulturalStoryPanel';
 
 interface RecipeDetailProps {
     recipe: Recipe;
@@ -365,6 +366,9 @@ export const RecipeDetail: React.FC<RecipeDetailProps> = ({
                         </div>
                     </div>
                 )}
+
+                {/* Cultural Story Mode - Educational Context */}
+                <CulturalStoryPanel recipe={recipe} />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                     <div className="space-y-8">
