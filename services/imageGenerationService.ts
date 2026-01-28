@@ -216,21 +216,24 @@ export async function generateRecipeImage(
     restaurant quality plating, vibrant colors, award-winning photography,
     detailed textures, shallow depth of field, garnished beautifully.`;
 
-  // Try HuggingFace first (free, unlimited)
+  // Try OpenAI DALL-E FIRST (best quality, most reliable)
+  if (OPENAI_API_KEY) {
+    console.log('🎯 Using OpenAI DALL-E (primary)');
+    const result = await generateWithOpenAI(prompt);
+    if (result.success && result.imageUrl) {
+      return result.imageUrl;
+    }
+    console.warn('⚠️ OpenAI failed, trying HuggingFace...');
+  }
+
+  // Try HuggingFace as fallback
   let result = await generateWithHuggingFace(prompt);
   if (result.success && result.imageUrl) {
     return result.imageUrl;
   }
 
-  // Try OpenAI DALL-E (if API key available)
-  if (OPENAI_API_KEY) {
-    result = await generateWithOpenAI(prompt);
-    if (result.success && result.imageUrl) {
-      return result.imageUrl;
-    }
-  }
-
-  // Fallback: Beautiful gradient placeholder
+  // Final fallback: Beautiful gradient placeholder
+  console.log('⚠️ All image APIs failed, using gradient fallback');
   result = getFallbackImage(recipeTitle);
   return result.imageUrl;
 }
